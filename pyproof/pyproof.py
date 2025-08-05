@@ -279,16 +279,80 @@ class RangeInt(RefinementType):
 class NonEmptyList(RefinementType):
     """Non-empty list"""
 
-    def __init__(self, element_type: Type = None):
-        predicate = lambda x: len(x) > 0
-        if element_type:
-            predicate = lambda x: len(x) > 0 and all(isinstance(e, element_type) for e in x)
+    def __init__(self, element_type_or_data=None):
+        # Check if the argument is actual data (a list) or a type specification
+        if isinstance(element_type_or_data, list):
+            # This is actual data to validate - create a basic non-empty validator
+            predicate = lambda x: len(x) > 0
+            super().__init__(
+                list,
+                predicate,
+                "non-empty list"
+            )
+            # Validate and store the data immediately
+            self._validated_data = self.validate(element_type_or_data)
+        else:
+            # This is a type specification (or None)
+            element_type = element_type_or_data
+            predicate = lambda x: len(x) > 0
 
-        super().__init__(
-            list,
-            predicate,
-            f"non-empty list" + (f" of {element_type.__name__}" if element_type else "")
-        )
+            if element_type:
+                predicate = lambda x: len(x) > 0 and all(isinstance(e, element_type) for e in x)
+
+            # Safely get the type name
+            type_name = ""
+            if element_type:
+                if hasattr(element_type, '__name__'):
+                    type_name = f" of {element_type.__name__}"
+                else:
+                    type_name = f" of {str(element_type)}"
+
+            super().__init__(
+                list,
+                predicate,
+                f"non-empty list{type_name}"
+            )
+            self._validated_data = None
+
+    def __call__(self, value=None):
+        """Allow type to be used as constructor or return validated data"""
+        if value is None and hasattr(self, '_validated_data') and self._validated_data is not None:
+            # Return the already validated data
+            return self._validated_data
+        elif value is not None:
+            # Validate the provided value
+            return self.validate(value)
+        else:
+            # This shouldn't happen, but handle gracefully
+            raise ValueError("No data provided for validation")
+
+    def __iter__(self):
+        """Make the validated list iterable"""
+        if hasattr(self, '_validated_data') and self._validated_data is not None:
+            return iter(self._validated_data)
+        else:
+            raise ValueError("No validated data available for iteration")
+
+    def __len__(self):
+        """Return length of validated data"""
+        if hasattr(self, '_validated_data') and self._validated_data is not None:
+            return len(self._validated_data)
+        else:
+            return 0
+
+    def __getitem__(self, index):
+        """Allow indexing into validated data"""
+        if hasattr(self, '_validated_data') and self._validated_data is not None:
+            return self._validated_data[index]
+        else:
+            raise ValueError("No validated data available for indexing")
+
+    def __repr__(self):
+        """String representation"""
+        if hasattr(self, '_validated_data') and self._validated_data is not None:
+            return f"NonEmptyList({self._validated_data})"
+        else:
+            return f"NonEmptyList(type={self.description})"
 
 
 class ValidatedString(RefinementType):
@@ -637,9 +701,26 @@ class CryptoPlugin(Plugin):
     @staticmethod
     def verify_secure_random(random_func: Callable) -> bool:
         """Verify random number generator is cryptographically secure"""
-        # This is a simplified check - real implementation would be more sophisticated
         import secrets
-        return random_func.__module__ == 'secrets' or hasattr(random_func, 'SystemRandom')
+        import random
+
+        # Check if it's from the secrets module
+        if hasattr(random_func, '__module__') and random_func.__module__ == 'secrets':
+            return True
+
+        # Check if it's the secrets.randbits function specifically
+        if random_func is secrets.randbits:
+            return True
+
+        # Check if it's a SystemRandom method
+        if hasattr(random_func, '__self__') and isinstance(random_func.__self__, random.SystemRandom):
+            return True
+
+        # Check if it has SystemRandom attribute
+        if hasattr(random_func, 'SystemRandom'):
+            return True
+
+        return False
 
 
 # Financial Calculation Plugin
@@ -813,7 +894,6 @@ def gradually_verify(level: VerificationLevel = VerificationLevel.CONTRACTS):
 def auto_contract(func):
     """Automatically generate contracts from type hints"""
     import inspect
-    # from typing import get_origin, get_args
 
     sig = inspect.signature(func)
     preconditions = []
@@ -824,104 +904,155 @@ def auto_contract(func):
         if param.annotation != inspect.Parameter.empty:
             param_type = param.annotation
 
-            # Handle both regular types and custom objects
-            type_name = getattr(param_type, '__name__', str(param_type))
+            # Handle refinement types
+            if (isinstance(param_type, type) and
+                    issubclass(param_type, RefinementType)):
 
-            # Create closure to capture variables properly and handle refinement types
-            def make_precondition(pt, pn, param_obj):
-                def check_type(*args, **kwargs):
-                    # First try to get from kwargs
-                    value = kwargs.get(pn)
+                def make_refinement_precondition(pt, pn, param_obj):
+                    def check_refinement(*args, **kwargs):
+                        # Get the parameter value
+                        value = kwargs.get(pn)
+                        if value is None:
+                            param_names = list(sig.parameters.keys())
+                            try:
+                                param_index = param_names.index(pn)
+                                if param_index < len(args):
+                                    value = args[param_index]
+                            except (ValueError, IndexError):
+                                pass
 
-                    # If not in kwargs, try to get from args by position
-                    if value is None:
-                        param_names = list(sig.parameters.keys())
+                        if value is None and param_obj.default != inspect.Parameter.empty:
+                            value = param_obj.default
+
+                        if value is None:
+                            return True  # Skip validation for missing optional parameters
+
                         try:
-                            param_index = param_names.index(pn)
-                            if param_index < len(args):
-                                value = args[param_index]
-                        except (ValueError, IndexError):
-                            pass
-
-                    # If still None and parameter has a default, use the default
-                    if value is None and param_obj.default != inspect.Parameter.empty:
-                        value = param_obj.default
-
-                    # If still None, this parameter wasn't provided and has no default
-                    if value is None:
-                        return True  # Skip validation for missing optional parameters
-
-                    # Handle refinement types
-                    if hasattr(pt, 'validate'):
-                        try:
-                            pt.validate(value)
+                            # For refinement types, create an instance and validate
+                            if hasattr(pt, '_validated_data'):
+                                # This is an instantiated refinement type
+                                pt.validate(value)
+                            else:
+                                # This is a refinement type class, instantiate it
+                                refinement_instance = pt()
+                                refinement_instance.validate(value)
                             return True
-                        except:
+                        except ProofFailure:
                             return False
-                    # Handle typing generics
-                    elif hasattr(pt, '__origin__'):
-                        return _check_typing_generic(value, pt)
-                    # Handle regular types
-                    else:
-                        try:
-                            return isinstance(value, pt)
-                        except TypeError:
-                            return True  # Skip validation for non-type annotations
+                        except Exception:
+                            return False
 
-                return check_type
+                    return check_refinement
 
-            preconditions.append((
-                f"{param_name} is {type_name}",
-                make_precondition(param_type, param_name, param)
-            ))
+                type_name = getattr(param_type, '__name__', str(param_type))
+                preconditions.append((
+                    f"{param_name} is {type_name}",
+                    make_refinement_precondition(param_type, param_name, param)
+                ))
+
+            else:
+                # Handle regular types and typing generics
+                type_name = getattr(param_type, '__name__', str(param_type))
+
+                def make_precondition(pt, pn, param_obj):
+                    def check_type(*args, **kwargs):
+                        value = kwargs.get(pn)
+                        if value is None:
+                            param_names = list(sig.parameters.keys())
+                            try:
+                                param_index = param_names.index(pn)
+                                if param_index < len(args):
+                                    value = args[param_index]
+                            except (ValueError, IndexError):
+                                pass
+
+                        if value is None and param_obj.default != inspect.Parameter.empty:
+                            value = param_obj.default
+
+                        if value is None:
+                            return True  # Skip validation for missing optional parameters
+
+                        # Handle typing generics
+                        if hasattr(pt, '__origin__'):
+                            return _check_typing_generic(value, pt)
+                        # Handle regular types
+                        else:
+                            try:
+                                return isinstance(value, pt)
+                            except TypeError:
+                                return True  # Skip validation for non-type annotations
+
+                    return check_type
+
+                preconditions.append((
+                    f"{param_name} is {type_name}",
+                    make_precondition(param_type, param_name, param)
+                ))
 
     # Generate postcondition from return type
     if sig.return_annotation != inspect.Parameter.empty:
         return_type = sig.return_annotation
-        type_name = getattr(return_type, '__name__', str(return_type))
 
-        # Handle refinement types in postconditions too
-        def make_postcondition(rt):
-            def check_result(*args, **kwargs):
-                result = kwargs.get('result')
+        # Handle refinement types in return annotations
+        if (isinstance(return_type, type) and
+                issubclass(return_type, RefinementType)):
 
-                # Handle None return type
-                if rt is type(None) or rt is None:
-                    return result is None
-
-                # Handle string annotations like "None"
-                if isinstance(rt, str):
-                    if rt.lower() == "none":
-                        return result is None
-                    # For other string types, just return True (skip validation)
-                    return True
-
-                # Handle refinement types
-                if hasattr(rt, 'validate'):
-                    try:
-                        rt.validate(result)
+            def make_refinement_postcondition(rt):
+                def check_result(*args, **kwargs):
+                    result = kwargs.get('result')
+                    if result is None:
                         return True
-                    except:
+
+                    try:
+                        if hasattr(rt, '_validated_data'):
+                            rt.validate(result)
+                        else:
+                            refinement_instance = rt()
+                            refinement_instance.validate(result)
+                        return True
+                    except ProofFailure:
+                        return False
+                    except Exception:
                         return False
 
-                # Handle typing generics
-                if hasattr(rt, '__origin__'):
-                    return _check_typing_generic(result, rt)
+                return check_result
 
-                # Handle regular types - but check if it's actually a type first
-                try:
-                    return isinstance(result, rt)
-                except TypeError:
-                    # If isinstance fails, the annotation isn't a proper type
-                    # Just return True to skip validation
-                    return True
+            type_name = getattr(return_type, '__name__', str(return_type))
+            postconditions.append((
+                f"result is {type_name}",
+                make_refinement_postcondition(return_type)
+            ))
 
-            return check_result
+        else:
+            # Handle regular return types
+            type_name = getattr(return_type, '__name__', str(return_type))
 
-        postconditions.append((
-            f"result is {type_name}",
-            make_postcondition(return_type)
-        ))
+            def make_postcondition(rt):
+                def check_result(*args, **kwargs):
+                    result = kwargs.get('result')
+
+                    if rt is type(None) or rt is None:
+                        return result is None
+
+                    if isinstance(rt, str):
+                        if rt.lower() == "none":
+                            return result is None
+                        return True
+
+                    if hasattr(rt, '__origin__'):
+                        return _check_typing_generic(result, rt)
+
+                    try:
+                        return isinstance(result, rt)
+                    except TypeError:
+                        return True
+
+                return check_result
+
+            postconditions.append((
+                f"result is {type_name}",
+                make_postcondition(return_type)
+            ))
 
     return contract(preconditions, postconditions)(func)
 
@@ -1109,22 +1240,22 @@ def get_temporal_history():
 # File-like protocol, allow proper read/write transitions
 filemanager_protocol = Protocol("FileManager", "closed")
 filemanager_protocol.add_state(ProtocolState("closed", ["open"]))
-filemanager_protocol.add_state(ProtocolState("open", ["read", "write", "close"]))
-filemanager_protocol.add_state(ProtocolState("read", ["read", "write", "close"]))  # Can read again, write, or close
-filemanager_protocol.add_state(ProtocolState("write", ["read", "write", "close"]))  # Can read, write again, or close
-filemanager_protocol.add_state(ProtocolState("close", ["closed"]))
+filemanager_protocol.add_state(ProtocolState("open", ["read", "write", "closed"]))  # Allow direct close
+filemanager_protocol.add_state(ProtocolState("read", ["read", "write", "closed"]))  # Allow direct close
+filemanager_protocol.add_state(ProtocolState("write", ["read", "write", "closed"]))  # Allow direct close
 
 # State machine protocol, allowed_transitions should be TARGET STATES, not method names
 statemachine_protocol = Protocol("StateMachine", "stopped")
 statemachine_protocol.add_state(ProtocolState("stopped", ["running"]))  # From stopped, can go to running (via start())
 statemachine_protocol.add_state(ProtocolState("running", ["stopped", "process"]))  # From running, can go to stopped (via stop()) or process (via process())
-statemachine_protocol.add_state(ProtocolState("process", ["running", "stopped"]))  # From process, can go back to running or stopped
+statemachine_protocol.add_state(ProtocolState("process", ["running", "stopped", "process"]))  # Added "process" - allow staying in process state
 
 # Database connection protocol
 dbconnection_protocol = Protocol("DatabaseConnection", "disconnected")
 dbconnection_protocol.add_state(ProtocolState("disconnected", ["connected"]))
-dbconnection_protocol.add_state(ProtocolState("connected", ["connected", "disconnected"]))  # Can stay connected or disconnect
-dbconnection_protocol.add_state(ProtocolState("transaction", ["connected"]))  # Transaction ends back to connected
+dbconnection_protocol.add_state(ProtocolState("connected", ["connected", "transaction", "disconnected"]))  # Added "transaction"
+# dbconnection_protocol.add_state(ProtocolState("transaction", ["connected"]))  # Transaction ends back to connected
+dbconnection_protocol.add_state(ProtocolState("transaction", ["transaction", "connected"]))  # Allow staying in transaction for multiple operations
 
 # HTTP client protocol
 httpclient_protocol = Protocol("HttpClient", "idle")
