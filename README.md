@@ -390,8 +390,6 @@ See the `examples/` directory for complete examples:
 - `security_verification.py` - Information flow and crypto verification
 - `performance_optimization.py` - Production deployment patterns
 
-### NOTE: examples/ do not exist yet.
-
 ## Contributing
 
 1. Fork the repository
