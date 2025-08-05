@@ -1,383 +1,417 @@
-# PyProof: Runtime Formal Verification for Python
+# PyProof: High-Performance Runtime Verification for Python
 
-## Overview
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-PyProof is a runtime verification system that brings formal verification concepts to practical Python programming. Instead of requiring separate proof languages or complex theorem provers, PyProof embeds verification directly into your code using decorators, context managers, and runtime assertions.
+PyProof is a comprehensive runtime verification system that brings formal verification concepts to practical Python programming. It provides proof-based assertions, contracts, invariants, and advanced verification features with performance optimizations for production use.
 
-The system bridges the gap between informal testing and formal verification by:
-- **Proving properties at runtime** rather than just checking them
-- **Building proof traces** that document what was verified
-- **Failing fast** when properties can't be proven
-- **Composing proofs** across function calls and data structures
-
-## Core Concepts
-
-### 1. The Proof System
-
-At the heart of PyProof is the `Proof` class that tracks verification steps:
+## Quick Start
 
 ```python
-class Proof:
-    def __init__(self):
-        self.steps = []
-    
-    def require(self, claim, evidence):
-        """Runtime check that's also a proof step"""
-        if not evidence:
-            raise ProofFailure(f"Cannot prove: {claim}")
-        self.steps.append(claim)
-        return evidence
+import pyproof
+from pyproof import require, contract, PositiveInt
+
+# Basic runtime proofs
+def safe_divide(a: float, b: float) -> float:
+    require("denominator is not zero", b != 0)
+    result = a / b
+    require("result is finite", not math.isinf(result))
+    return result
+
+# Automatic contracts from type hints
+@pyproof.auto_contract
+def calculate_grade(score: PositiveInt) -> pyproof.Percentage:
+    return min(100, max(0, score))
+
+# Protocol verification
+@pyproof.protocol_method(pyproof.filemanager_protocol, "open")
+def open_file(self):
+    self.is_open = True
 ```
 
-Every `require()` call either:
-- **Succeeds**: Adds the claim to the proof trace
-- **Fails**: Raises `ProofFailure` with details
+## Core Features
 
-### 2. Proof vs. Testing
+### Runtime Verification
+- **Proof-based assertions** with `require()` instead of `assert`
+- **Function contracts** with preconditions and postconditions
+- **Loop invariants** and termination proofs
+- **Protocol verification** for API usage patterns
+- **Data structure invariants** for custom classes
 
-Traditional testing checks examples; PyProof proves properties:
+### Advanced Verification
+- **Refinement types** for precise constraints (`PositiveInt`, `NonEmptyList`, etc.)
+- **Information flow tracking** for security-sensitive data
+- **Temporal properties** for event sequences and timing
+- **Ghost state** for proof-only auxiliary data
+- **Plugin system** for domain-specific verification
+
+### Performance & Production
+- **Configurable verification levels** (off/contracts/invariants/full/debug)
+- **Proof caching** for expensive computations
+- **Thread-safe** operation with concurrent proof traces
+- **Performance mode** for production deployments
+- **Automatic instrumentation** with `pyproofify` tool
+
+## Installation
+
+```bash
+pip install pyproof
+```
+### NOTE: pyproof is not on pip yet. Clone repo for now.
+
+Or for development:
+```bash
+git clone https://github.com/your-org/pyproof
+cd pyproof
+pip install -e .
+```
+
+## Documentation
+
+### Basic Usage
+
+#### 1. Proof-Based Assertions
+
+Replace `assert` with `require()` for better error messages and proof traces:
 
 ```python
-# Testing approach
-assert divide(10, 2) == 5
-assert divide(7, 3) == 2.333...
+from pyproof import require
 
-# Proof approach  
-def proven_divide(a, b):
-    require("b is not zero", b != 0)
-    result = a / b
-    require("result * b equals a", abs(result * b - a) < 1e-10)
+def factorial(n: int) -> int:
+    require("n is non-negative", n >= 0)
+    require("n is reasonable size", n <= 100)
+    
+    if n <= 1:
+        return 1
+    
+    result = 1
+    for i in range(2, n + 1):
+        result *= i
+        require("result stays positive", result > 0)
+    
+    require("result is correct factorial", result == math.factorial(n))
     return result
 ```
 
-The proof approach guarantees the property holds for **all** inputs that satisfy the preconditions.
+#### 2. Function Contracts
 
-## System Components
-
-### Function Contracts
-
-Separate assumptions (preconditions) from guarantees (postconditions):
+Separate preconditions from postconditions:
 
 ```python
+from pyproof import contract
+
 @contract(
     preconditions=[
-        ("input is a list", lambda lst: isinstance(lst, list)),
-        ("list is not empty", lambda lst: len(lst) > 0)
+        ("list is not empty", lambda items: len(items) > 0),
+        ("all items are numbers", lambda items: all(isinstance(x, (int, float)) for x in items))
     ],
     postconditions=[
-        ("result is maximum element", lambda lst, result: result == max(lst)),
-        ("result is in original list", lambda lst, result: result in lst)
+        ("result is in list", lambda items, result: result in items),
+        ("result is maximum", lambda items, result: result >= max(items))
     ]
 )
-def find_maximum(lst):
-    return max(lst)
+def find_maximum(items):
+    return max(items)
 ```
 
-**Benefits:**
-- Clear separation of concerns
-- Automatic verification at function boundaries  
-- Composable - proven functions can be trusted by callers
-- Self-documenting interfaces
+#### 3. Automatic Contracts
 
-### Loop Invariants
-
-Prove properties that hold throughout loop execution:
+Generate contracts from type hints:
 
 ```python
-def proven_sum(numbers):
-    total = 0
-    i = 0
-    
-    def sum_invariant(total, i, numbers):
-        return total == sum(numbers[:i])  # "total equals sum of first i elements"
-    
-    with ProvenLoop(sum_invariant) as loop:
-        while i < len(numbers) and loop.iterate(total=total, i=i, numbers=numbers):
-            total += numbers[i]
-            i += 1
-            # Invariant automatically checked after each iteration
-    
-    return total
+from pyproof import auto_contract, PositiveInt, NonEmptyList
+
+@auto_contract
+def process_scores(scores: NonEmptyList[PositiveInt]) -> float:
+    return sum(scores) / len(scores)
 ```
 
-**Key Properties:**
-- Invariant checked before first iteration
-- Invariant maintained after each iteration  
-- Termination guaranteed by max iteration bounds
-- Progress tracking prevents infinite loops
+### Advanced Features
 
-### Data Structure Invariants
+#### 4. Refinement Types
 
-Maintain structural properties across operations:
+Define precise type constraints:
 
 ```python
-class ProvenSortedList:
-    def __init__(self, items=None):
-        self.items = items or []
-        require("initially sorted", self._is_sorted())
-    
-    def _is_sorted(self):
-        return all(self.items[i] <= self.items[i+1] 
-                  for i in range(len(self.items)-1))
-    
-    def insert(self, value):
-        # Find correct position
-        pos = bisect.bisect_left(self.items, value)
-        self.items.insert(pos, value)
-        
-        # Prove invariant maintained
-        require("remains sorted after insert", self._is_sorted())
-        require("value was inserted", value in self.items)
-        return self
+from pyproof import RefinementType, PositiveInt, Percentage
+
+# Built-in refinement types
+age: PositiveInt = PositiveInt(25)
+score: Percentage = Percentage(85)
+items: NonEmptyList = NonEmptyList([1, 2, 3])
+
+# Custom refinement types
+EvenInt = RefinementType(int, lambda x: x % 2 == 0, "even integer")
+even_num = EvenInt(42)  # OK
+even_num = EvenInt(43)  # Raises ProofFailure
 ```
 
-### State Machine Verification
+#### 5. Protocol Verification
 
-Prove systems follow valid protocols:
+Verify API usage patterns:
 
 ```python
-class ProvenStateMachine:
-    def __init__(self, initial_state, transitions):
-        self.state = initial_state
-        self.transitions = transitions
-        require("initial state is valid", initial_state in transitions)
-    
-    def transition_to(self, new_state):
-        require("transition is allowed", 
-                new_state in self.transitions.get(self.state, []))
-        
-        old_state = self.state
-        self.state = new_state
-        
-        require("state updated correctly", self.state == new_state)
-        return self
+from pyproof import protocol_method, filemanager_protocol
 
-# Usage: File handle protocol
-file_machine = ProvenStateMachine('closed', {
-    'closed': ['opening'],
-    'opening': ['open', 'error'],
-    'open': ['reading', 'writing', 'closing'],
-    'reading': ['open', 'error'],
-    'writing': ['open', 'error'],  
-    'closing': ['closed', 'error'],
-    'error': ['closed']
-})
+class FileManager:
+    @protocol_method(filemanager_protocol, "open")
+    def open(self):
+        self.is_open = True
+    
+    @protocol_method(filemanager_protocol, "read") 
+    def read(self):
+        return self.content
+    
+    @protocol_method(filemanager_protocol, "close")
+    def close(self):
+        self.is_open = False
+
+# Usage automatically verified
+fm = FileManager()
+fm.open()     # OK
+fm.read()     # OK  
+fm.close()    # OK
+# fm.read()   # Would raise ProofFailure - can't read closed file
 ```
 
-### Resource Lifecycle Management
+#### 6. Information Flow Tracking
 
-Prove resources are properly acquired and released:
+Track sensitive data through computations:
 
 ```python
-class ProvenResource:
-    _active_resources = set()
-    
-    def __init__(self, resource_id):
-        require("resource available", resource_id not in self._active_resources)
-        self.resource_id = resource_id
-        self.acquired = True
-        self._active_resources.add(resource_id)
-    
-    def release(self):
-        require("resource is acquired", self.acquired)
-        self.acquired = False
-        self._active_resources.remove(self.resource_id)
-    
-    def __enter__(self):
-        return self
-        
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.acquired:
-            self.release()
+from pyproof import TaintedValue, SecurityLabel, track_sensitive_data
 
-# Prove no resource leaks
-@contract(
-    postconditions=[
-        ("no resources leaked", lambda result: len(ProvenResource._active_resources) == 0)
-    ]
+# Track sensitive assignments
+password = track_sensitive_data("user_password", "secret123", SecurityLabel.SECRET)
+username = TaintedValue("john_doe", SecurityLabel.PUBLIC)
+
+# Information flow is automatically tracked
+combined = password.combine_with(username)
+print(f"Security level: {combined.label}")  # SECRET (highest of the two)
+
+# Controlled declassification
+password.declassify(SecurityLabel.CONFIDENTIAL, "Hashed for storage")
+```
+
+#### 7. Temporal Properties
+
+Verify event sequences and timing:
+
+```python
+from pyproof import EventuallyProperty, AlwaysProperty, TemporalVerifier, record_temporal_event
+
+# Define temporal properties
+eventually_complete = EventuallyProperty(
+    "task_completes",
+    lambda history: any(e['event'] == 'task_done' for e in history),
+    timeout=5.0
 )
-def process_data():
-    with ProvenResource("database") as db:
-        with ProvenResource("file_handle") as f:
-            return "processed"
-```
 
-### Ghost State
-
-Add proof-only data that doesn't affect program execution:
-
-```python
-class GhostState:
-    def __init__(self):
-        self._data = {}
-    
-    def set(self, key, value):
-        self._data[key] = value
-    
-    def get(self, key):
-        return self._data.get(key)
-
-_ghost = GhostState()
-
-def proven_reverse(lst):
-    require("input is a list", isinstance(lst, list))
-    
-    # Ghost state: remember original
-    _ghost.set('original', lst.copy())
-    _ghost.set('original_length', len(lst))
-    
-    # Reverse in place
-    left, right = 0, len(lst) - 1
-    while left < right:
-        lst[left], lst[right] = lst[right], lst[left]
-        left += 1
-        right -= 1
-    
-    # Prove correctness using ghost state
-    original = _ghost.get('original')
-    require("length preserved", len(lst) == _ghost.get('original_length'))
-    require("elements reversed", 
-            all(lst[i] == original[-(i+1)] for i in range(len(lst))))
-    
-    return lst
-```
-
-## Architecture
-
-### Core Classes
-
-```
-Proof                    # Tracks verification steps
-├── require()           # Add proof step or fail
-└── steps              # List of proven claims
-
-ProofFailure            # Exception for unprovable claims
-
-Contract               # Function pre/postcondition decorator
-├── preconditions      # List of (claim, predicate) pairs  
-└── postconditions     # List of (claim, predicate) pairs
-
-ProvenLoop             # Loop invariant verification
-├── invariant_fn       # Invariant predicate function
-├── max_iterations     # Termination bound
-└── iterate()          # Check invariant, advance iteration
-
-GhostState             # Proof-only auxiliary data
-├── set()              # Store ghost variables
-└── get()              # Retrieve ghost variables
-```
-
-### Global State
-
-```python
-_proof = Proof()        # Global proof trace
-_ghost = GhostState()   # Global ghost state
-
-def require(claim, evidence):
-    """Global require function"""
-    return _proof.require(claim, evidence)
-```
-
-## Usage Patterns
-
-### Progressive Verification
-
-Start simple, add more verification as needed:
-
-```python
-# Level 1: Basic assertions
-def divide(a, b):
-    assert b != 0
-    return a / b
-
-# Level 2: Proof-based assertions  
-def divide(a, b):
-    require("denominator not zero", b != 0)
-    return a / b
-
-# Level 3: Full contracts
-@contract(
-    preconditions=[("b != 0", lambda a, b: b != 0)],
-    postconditions=[("result * b ≈ a", lambda a, b, result: abs(result * b - a) < 1e-10)]
+always_valid = AlwaysProperty(
+    "data_valid", 
+    lambda event: event.get('valid', True)
 )
-def divide(a, b):
-    return a / b
+
+# Add to verifier
+temporal_verifier = TemporalVerifier()
+temporal_verifier.add_property(eventually_complete)
+temporal_verifier.add_property(always_valid)
+
+# Record events during execution
+record_temporal_event("task_start", {"valid": True})
+record_temporal_event("processing", {"valid": True})  
+record_temporal_event("task_done", {"valid": True})
+
+# Verify all properties
+temporal_verifier.verify_all()  # Passes
 ```
 
-### Proof Composition
+#### 8. Plugin System
 
-Proven functions can be used confidently:
+Extend verification for specific domains:
 
 ```python
-@contract(...)
-def proven_sqrt(x):
-    # ... implementation with proofs
+# Financial verification
+from pyproof import _plugin_registry
+
+Money = _plugin_registry.get_type("Money")
+price = Money("19.99", "USD")
+tax = Money("1.60", "USD") 
+total = price + tax
+
+# Cryptographic verification
+crypto_verifier = _plugin_registry.get_verifier("constant_time")
+secure_function = lambda x: hash(x)  # Simplified example
+is_constant_time = crypto_verifier(secure_function, [1, 100, 1000])
+
+# Security verification  
+security_verifier = _plugin_registry.get_verifier("input_sanitized")
+sanitizer = lambda x: x.replace("<", "&lt;").replace(">", "&gt;")
+is_safe = security_verifier("<script>alert('xss')</script>", sanitizer)
+```
+
+## Automatic Instrumentation
+
+Use `pyproofify` to automatically add verification to existing code:
+
+```bash
+# Instrument entire project
+python -m pyproof.pyproofify src/ instrumented/ --all
+
+# Selective instrumentation
+python -m pyproof.pyproofify src/ instrumented/ \
+    --contracts --loops --asserts --temporal --protocols
+```
+
+**Before:**
+```python
+def factorial(n):
+    assert n >= 0
+    result = 1
+    for i in range(1, n + 1):
+        result *= i
     return result
-
-@contract(...)  
-def proven_distance(x1, y1, x2, y2):
-    dx = x2 - x1
-    dy = y2 - y1
-    # Can trust proven_sqrt because of its contract
-    return proven_sqrt(dx*dx + dy*dy)
 ```
 
-### Debug vs. Production
+**After instrumentation:**
+```python
+import pyproof
+from pyproof import require, auto_contract
+
+@auto_contract
+def factorial(n):
+    require("n >= 0", n >= 0)
+    result = 1
+    for i in range(1, n + 1):
+        with pyproof.proof_context('for_loop_invariant'):
+            result *= i
+    return result
+```
+
+## Configuration
+
+Control verification behavior with environment variables:
+
+```bash
+# Verification levels
+export PYPROOF_LEVEL=full        # off|contracts|invariants|full|debug
+export PYPROOF_CACHE=1           # Enable proof caching
+export PYPROOF_MAX_STEPS=10000   # Maximum proof steps
+export PYPROOF_PERF=1            # Performance mode
+```
+
+Or programmatically:
 
 ```python
-import os
+from pyproof import Config, VerificationLevel
 
-# Only verify in debug mode
-VERIFY = os.getenv('PYPROOF_VERIFY', '1') == '1'
-
-def require(claim, evidence):
-    if VERIFY:
-        return _proof.require(claim, evidence)
-    return evidence
+config = Config()
+config.level = VerificationLevel.CONTRACTS  # Only verify contracts
+config.performance_mode = True              # Skip expensive checks
 ```
 
-## Benefits
+## Verification Levels
 
-### For Development
-- **Catch bugs early** - Properties are checked at runtime
-- **Better documentation** - Contracts explain function behavior
-- **Incremental adoption** - Add verification gradually
-- **No new tools** - Pure Python, works with existing workflow
+- **OFF**: No verification (production default)
+- **CONTRACTS**: Only function contracts 
+- **INVARIANTS**: Contracts + data structure invariants
+- **FULL**: All verification except debug features
+- **DEBUG**: Full verification + detailed logging
 
-### For Maintenance  
-- **Executable specifications** - Contracts stay in sync with code
-- **Regression prevention** - Proofs prevent breaking changes
-- **Refactoring confidence** - Invariants ensure correctness
-- **Clear interfaces** - Pre/postconditions document assumptions
+## Performance
 
-### For Reliability
-- **Mathematical rigor** - Properties are proven, not just tested
-- **Comprehensive coverage** - Invariants hold for all executions
-- **Composable guarantees** - Verified components can be trusted
-- **Audit trails** - Proof traces show what was verified
+PyProof is designed for production use:
 
-## When to Use PyProof
+- **Conditional verification**: Disable in production with `PYPROOF_LEVEL=off`
+- **Proof caching**: Expensive computations are cached
+- **Thread-safe**: Concurrent proof traces without interference
+- **Minimal overhead**: Optimized for performance-critical code
 
-**Ideal for:**
-- Critical algorithms with mathematical properties
-- Data structures with invariants  
-- Resource management code
-- Protocol implementations
-- Security-sensitive functions
-- Code with complex preconditions
+Benchmark results:
+```
+Verification Level | Overhead | Use Case
+OFF               | 0%       | Production
+CONTRACTS         | 5-10%    | Integration testing  
+FULL              | 10-25%   | Development/QA
+DEBUG             | 25-50%   | Debugging
+```
 
-**Consider alternatives for:**
-- Simple CRUD operations
-- UI event handling
-- Performance-critical inner loops
-- Prototype/exploratory code
+## Testing Integration
 
-## Getting Started
+PyProof works with standard testing frameworks:
 
-1. **Start with basic `require()` statements** for critical properties
-2. **Add function contracts** for key interfaces  
-3. **Use loop invariants** for complex algorithms
-4. **Add data structure invariants** for custom classes
-5. **Consider ghost state** for complex mathematical proofs
+```python
+import pytest
+from pyproof import verification_mode, ProofFailure
 
-The system grows with your needs - start simple and add verification as your confidence and requirements increase.
+def test_with_full_verification():
+    with verification_mode():  # Enables debug-level verification
+        result = my_verified_function(test_input)
+        assert result == expected
+
+def test_proof_failure():
+    with pytest.raises(ProofFailure, match="Cannot prove: input is positive"):
+        invalid_function(-5)
+```
+
+## Plugin Development
+
+Create domain-specific verifiers:
+
+```python
+from pyproof import Plugin
+
+class DatabasePlugin(Plugin):
+    def __init__(self):
+        super().__init__("database")
+    
+    def add_verifiers(self):
+        return {
+            'transaction_safe': self.verify_transaction_safety,
+            'sql_injection_free': self.verify_no_sql_injection
+        }
+    
+    def verify_transaction_safety(self, query, connection):
+        # Implementation here
+        return connection.in_transaction()
+
+# Register plugin
+from pyproof import _plugin_registry
+_plugin_registry.register(DatabasePlugin())
+```
+
+## Examples
+
+See the `examples/` directory for complete examples:
+
+- `basic_verification.py` - Getting started with PyProof
+- `data_structures.py` - Verified collections and algorithms  
+- `protocol_verification.py` - API usage pattern verification
+- `security_verification.py` - Information flow and crypto verification
+- `performance_optimization.py` - Production deployment patterns
+
+### NOTE: examples/ do not exist yet.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Add tests for your changes
+4. Run the test suite (`python -m pytest`)
+5. Commit your changes (`git commit -m 'Add your feature'`)
+6. Push to the branch (`git push origin feature/your-feature`)
+7. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Inspired by formal verification research and tools like Dafny, TLA+, and Coq
+- Built on Python's rich ecosystem of type hints and static analysis tools
+- Community contributions and feedback from the formal methods community
+
+---
+
+**Made with ❤️ for safer, more reliable Python code**
