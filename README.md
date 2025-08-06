@@ -63,7 +63,7 @@ While the demo runs, nothing is assumed to be production ready. Here be dragons.
 ```bash
 pip install axiomatik
 ```
-### NOTE: axiomatik is now on pip!
+### NOTE: axiomatik is now on pip! **BROKEN USE REPO FOR NOW.**
 
 Or for development:
 ```bash
