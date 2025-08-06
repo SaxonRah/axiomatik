@@ -1,6 +1,6 @@
-# test_example.py - Comprehensive test file for pyproofify features
+# test_example.py - Comprehensive test file for axiomatikify features
 """
-Test file demonstrating all PyProof instrumentation features:
+Test file demonstrating all Axiomatik instrumentation features:
 - Loops (for/while with invariants)
 - Ghost state tracking
 - Assert to require conversion
@@ -469,7 +469,7 @@ def find_maximum(numbers: List[int]) -> int:
 
 def main() -> None:
     """Main function to test all features"""
-    print("Starting comprehensive PyProof feature test...")
+    print("Starting comprehensive Axiomatik feature test...")
 
     # Test 1: Protocol classes
     print("\n1. Testing Protocol Classes:")

@@ -16,9 +16,9 @@ Run with: python protocol_verification.py
 import time
 import threading
 from typing import Optional, Dict, Any
-import pyproof.pyproof
-from pyproof.pyproof import require, protocol_method, Protocol, ProtocolState, ProofFailure
-from pyproof.pyproof import filemanager_protocol, statemachine_protocol, dbconnection_protocol
+import axiomatik.axiomatik
+from axiomatik.axiomatik import require, protocol_method, Protocol, ProtocolState, ProofFailure
+from axiomatik.axiomatik import filemanager_protocol, statemachine_protocol, dbconnection_protocol
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -651,7 +651,7 @@ def demonstrate_correct_protocols():
 
 def demonstrate_protocol_verification():
     """Main demonstration function"""
-    print("PyProof Protocol Verification Examples")
+    print("Axiomatik Protocol Verification Examples")
     print("~" * 80)
 
     # Show correct usage
@@ -670,14 +670,14 @@ def demonstrate_protocol_verification():
 
     # Show verification summary
     print("\n~~~~~~~ Verification Summary ~~~~~~~")
-    summary = pyproof.pyproof._proof.get_summary()
+    summary = axiomatik.axiomatik._proof.get_summary()
     print(f"Total proof steps: {summary['total_steps']}")
     print(f"Contexts verified: {len(summary['contexts'])}")
     print(f"Thread safety: {summary['thread_count']} threads involved")
 
-    if pyproof.pyproof._proof.steps:
+    if axiomatik.axiomatik._proof.steps:
         print("\nRecent protocol verifications:")
-        protocol_steps = [s for s in pyproof.pyproof._proof.steps[-10:]
+        protocol_steps = [s for s in axiomatik.axiomatik._proof.steps[-10:]
                           if 'protocol' in s.context.lower()]
         for step in protocol_steps[-5:]:
             print(f"  - {step.claim} ({step.context})")

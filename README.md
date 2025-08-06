@@ -1,15 +1,15 @@
-# PyProof: Performant Runtime Verification for Python
+# Axiomatik: Performant Runtime Verification for Python
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-PyProof is a comprehensive runtime verification system that brings formal verification concepts to practical Python programming. It provides proof-based assertions, contracts, invariants, and advanced verification features with performance optimizations for production use.
+Axiomatik is a comprehensive runtime verification system that brings formal verification concepts to practical Python programming. It provides proof-based assertions, contracts, invariants, and advanced verification features with performance optimizations for production use.
 
 ## Quick Start
 
 ```python
-import pyproof
-from pyproof import require, contract, PositiveInt
+import axiomatik
+from axiomatik import require, contract, PositiveInt
 
 # Basic runtime proofs
 def safe_divide(a: float, b: float) -> float:
@@ -19,12 +19,12 @@ def safe_divide(a: float, b: float) -> float:
     return result
 
 # Automatic contracts from type hints
-@pyproof.auto_contract
-def calculate_grade(score: PositiveInt) -> pyproof.Percentage:
+@axiomatik.auto_contract
+def calculate_grade(score: PositiveInt) -> axiomatik.Percentage:
     return min(100, max(0, score))
 
 # Protocol verification
-@pyproof.protocol_method(pyproof.filemanager_protocol, "open")
+@axiomatik.protocol_method(axiomatik.filemanager_protocol, "open")
 def open_file(self):
     self.is_open = True
 ```
@@ -50,7 +50,7 @@ def open_file(self):
 - **Proof caching** for expensive computations
 - **Thread-safe** operation with concurrent proof traces
 - **Performance mode** for production deployments
-- **Automatic instrumentation** with `pyproofify` tool
+- **Automatic instrumentation** with `axiomatikify` tool
 
 ## Future Features
 See `FutureFeatures.md` for Adaptive Monitoring, Performance Introspection, Recovery Framework.
@@ -61,14 +61,14 @@ While the demo runs, nothing is assumed to be production ready. Here be dragons.
 ## Installation
 
 ```bash
-pip install pyproof
+pip install axiomatik
 ```
-### NOTE: pyproof is not on pip yet. Clone repo for now.
+### NOTE: axiomatik is not on pip yet. Clone repo for now.
 
 Or for development:
 ```bash
-git clone https://github.com/your-org/pyproof
-cd pyproof
+git clone https://github.com/your-org/axiomatik
+cd axiomatik
 pip install -e .
 ```
 
@@ -81,7 +81,7 @@ pip install -e .
 Replace `assert` with `require()` for better error messages and proof traces:
 
 ```python
-from pyproof import require
+from axiomatik import require
 
 def factorial(n: int) -> int:
     require("n is non-negative", n >= 0)
@@ -104,7 +104,7 @@ def factorial(n: int) -> int:
 Separate preconditions from postconditions:
 
 ```python
-from pyproof import contract
+from axiomatik import contract
 
 @contract(
     preconditions=[
@@ -125,7 +125,7 @@ def find_maximum(items):
 Generate contracts from type hints:
 
 ```python
-from pyproof import auto_contract, PositiveInt, NonEmptyList
+from axiomatik import auto_contract, PositiveInt, NonEmptyList
 
 @auto_contract
 def process_scores(scores: NonEmptyList[PositiveInt]) -> float:
@@ -139,7 +139,7 @@ def process_scores(scores: NonEmptyList[PositiveInt]) -> float:
 Define precise type constraints:
 
 ```python
-from pyproof import RefinementType, PositiveInt, Percentage
+from axiomatik import RefinementType, PositiveInt, Percentage
 
 # Built-in refinement types
 age: PositiveInt = PositiveInt(25)
@@ -157,7 +157,7 @@ even_num = EvenInt(43)  # Raises ProofFailure
 Verify API usage patterns:
 
 ```python
-from pyproof import protocol_method, filemanager_protocol
+from axiomatik import protocol_method, filemanager_protocol
 
 class FileManager:
     @protocol_method(filemanager_protocol, "open")
@@ -185,7 +185,7 @@ fm.close()    # OK
 Track sensitive data through computations:
 
 ```python
-from pyproof import TaintedValue, SecurityLabel, track_sensitive_data
+from axiomatik import TaintedValue, SecurityLabel, track_sensitive_data
 
 # Track sensitive assignments
 password = track_sensitive_data("user_password", "secret123", SecurityLabel.SECRET)
@@ -204,7 +204,7 @@ password.declassify(SecurityLabel.CONFIDENTIAL, "Hashed for storage")
 Verify event sequences and timing:
 
 ```python
-from pyproof import EventuallyProperty, AlwaysProperty, TemporalVerifier, record_temporal_event
+from axiomatik import EventuallyProperty, AlwaysProperty, TemporalVerifier, record_temporal_event
 
 # Define temporal properties
 eventually_complete = EventuallyProperty(
@@ -238,7 +238,7 @@ Extend verification for specific domains:
 
 ```python
 # Financial verification
-from pyproof import _plugin_registry
+from axiomatik import _plugin_registry
 
 Money = _plugin_registry.get_type("Money")
 price = Money("19.99", "USD")
@@ -258,14 +258,14 @@ is_safe = security_verifier("<script>alert('xss')</script>", sanitizer)
 
 ## Automatic Instrumentation
 
-Use `pyproofify` to automatically add verification to existing code:
+Use `axiomatikify` to automatically add verification to existing code:
 
 ```bash
 # Instrument entire project
-python -m pyproof.pyproofify src/ instrumented/ --all
+python -m axiomatik.axiomatikify src/ instrumented/ --all
 
 # Selective instrumentation
-python -m pyproof.pyproofify src/ instrumented/ \
+python -m axiomatik.axiomatikify src/ instrumented/ \
     --contracts --loops --asserts --temporal --protocols
 ```
 
@@ -281,15 +281,15 @@ def factorial(n):
 
 **After instrumentation:**
 ```python
-import pyproof
-from pyproof import require, auto_contract
+import axiomatik
+from axiomatik import require, auto_contract
 
 @auto_contract
 def factorial(n):
     require("n >= 0", n >= 0)
     result = 1
     for i in range(1, n + 1):
-        with pyproof.proof_context('for_loop_invariant'):
+        with axiomatik.proof_context('for_loop_invariant'):
             result *= i
     return result
 ```
@@ -300,16 +300,16 @@ Control verification behavior with environment variables:
 
 ```bash
 # Verification levels
-export PYPROOF_LEVEL=full        # off|contracts|invariants|full|debug
-export PYPROOF_CACHE=1           # Enable proof caching
-export PYPROOF_MAX_STEPS=10000   # Maximum proof steps
-export PYPROOF_PERF=1            # Performance mode
+export AXIOMATIK_LEVEL=full        # off|contracts|invariants|full|debug
+export AXIOMATIK_CACHE=1           # Enable proof caching
+export AXIOMATIK_MAX_STEPS=10000   # Maximum proof steps
+export AXIOMATIK_PERF=1            # Performance mode
 ```
 
 Or programmatically:
 
 ```python
-from pyproof import Config, VerificationLevel
+from axiomatik import Config, VerificationLevel
 
 config = Config()
 config.level = VerificationLevel.CONTRACTS  # Only verify contracts
@@ -326,9 +326,9 @@ config.performance_mode = True              # Skip expensive checks
 
 ## Performance
 
-PyProof is designed for production use:
+Axiomatik is designed for production use:
 
-- **Conditional verification**: Disable in production with `PYPROOF_LEVEL=off`
+- **Conditional verification**: Disable in production with `AXIOMATIK_LEVEL=off`
 - **Proof caching**: Expensive computations are cached
 - **Thread-safe**: Concurrent proof traces without interference
 - **Minimal overhead**: Optimized for performance-critical code
@@ -344,11 +344,11 @@ DEBUG             | 25-50%   | Debugging
 
 ## Testing Integration
 
-PyProof works with standard testing frameworks:
+Axiomatik works with standard testing frameworks:
 
 ```python
 import pytest
-from pyproof import verification_mode, ProofFailure
+from axiomatik import verification_mode, ProofFailure
 
 def test_with_full_verification():
     with verification_mode():  # Enables debug-level verification
@@ -365,7 +365,7 @@ def test_proof_failure():
 Create domain-specific verifiers:
 
 ```python
-from pyproof import Plugin
+from axiomatik import Plugin
 
 class DatabasePlugin(Plugin):
     def __init__(self):
@@ -382,7 +382,7 @@ class DatabasePlugin(Plugin):
         return connection.in_transaction()
 
 # Register plugin
-from pyproof import _plugin_registry
+from axiomatik import _plugin_registry
 _plugin_registry.register(DatabasePlugin())
 ```
 
@@ -390,7 +390,7 @@ _plugin_registry.register(DatabasePlugin())
 
 See the `examples/` directory for complete examples:
 
-- `basic_verification.py` - Getting started with PyProof
+- `basic_verification.py` - Getting started with Axiomatik
 - `data_structures.py` - Verified collections and algorithms  
 - `protocol_verification.py` - API usage pattern verification
 - `security_verification.py` - Information flow and crypto verification

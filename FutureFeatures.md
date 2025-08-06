@@ -1,18 +1,18 @@
 # Future Features
 
-PyProof in the `future` folder includes cutting-edge enhancements that represent the future of runtime verification:
+Axiomatik in the `future` folder includes cutting-edge enhancements that represent the future of runtime verification:
 - **Adaptive Monitoring**
 - **Performance Introspection**
 - **Recovery Framework**
 
-These features provide enterprise-grade capabilities for production deployments. The future features position PyProof as one of the most advanced runtime verification system available, combining academic rigor with production practicality.
+These features provide enterprise-grade capabilities for production deployments. The future features position Axiomatik as one of the most advanced runtime verification system available, combining academic rigor with production practicality.
 
 ### Adaptive Monitoring
 
 Dynamically adjusts verification behavior based on runtime conditions and performance metrics.
 
 ```python
-from pyproof import adaptive_require, adaptive_verification_context, auto_tune_verification_level
+from axiomatik import adaptive_require, adaptive_verification_context, auto_tune_verification_level
 
 # Enable intelligent auto-tuning for 5% performance overhead target
 auto_tune_verification_level(target_overhead_percent=5.0)
@@ -55,7 +55,7 @@ Critical (> 500ms)| Emergency mode - only critical verifications
 Comprehensive performance analysis and optimization for verification hotspots.
 
 ```python
-from pyproof import (
+from axiomatik import (
     get_performance_hotspots, 
     generate_performance_report,
     visualize_performance
@@ -79,7 +79,7 @@ visualize_performance("verification_hotspots.png")
 
 **Sample Performance Analysis Output:**
 ```
-PyProof Performance Analysis
+Axiomatik Performance Analysis
 ==================================================
 
 Total properties verified: 13
@@ -112,7 +112,7 @@ Performance by Context:
 Multiple recovery strategies for handling verification failures gracefully in production.
 
 ```python
-from pyproof import (
+from axiomatik import (
     contract_with_recovery, 
     RecoveryStrategy, 
     RecoveryPolicy
@@ -190,7 +190,7 @@ def critical_state_mutation():
 All three future features work together for production-grade verification:
 
 ```python
-from pyproof import contract_with_recovery, adaptive_verification_context
+from axiomatik import contract_with_recovery, adaptive_verification_context
 
 @contract_with_recovery(
     preconditions=[("input is valid", lambda data: len(data) > 0)],
@@ -254,7 +254,7 @@ Example production configuration:
 
 ```python
 import os
-from pyproof import auto_tune_verification_level, VerificationLevel, Config
+from axiomatik import auto_tune_verification_level, VerificationLevel, Config
 
 # Environment-based configuration
 if os.getenv('ENVIRONMENT') == 'production':

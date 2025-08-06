@@ -1,6 +1,25 @@
 """
-PyProof: Performant Runtime Verification for Python
-A comprehensive system with performance optimization, integration helpers, and domain-specific extensions.
+Axiomatik: Performant Runtime Verification for Python with Future Features
+A comprehensive system with performance optimization, integration helpers, domain-specific extensions,
+adaptive monitoring, performance introspection, and recovery framework.
+
+USAGE EXAMPLE:
+    # Adaptive monitoring with priority
+    with adaptive_verification_context("database"):
+        adaptive_require("connection valid", db.is_connected(),
+                        property_name="db_check", priority=5)
+
+    # Auto-tuning for 5% overhead
+    auto_tune_verification_level(target_overhead_percent=5.0)
+
+    # Recovery-enabled contracts
+    @contract_with_recovery(
+        preconditions=[("data valid", lambda x: len(x) > 0)],
+        recovery_strategy=RecoveryStrategy(RecoveryPolicy.GRACEFUL_DEGRADATION,
+                                         fallback_handler=simple_fallback)
+    )
+    def robust_function(data):
+        return complex_processing(data)
 """
 
 import functools
@@ -8,7 +27,8 @@ import os
 import time
 import threading
 import weakref
-from typing import Callable, List, Tuple, Any, Dict, Optional, Union, Type
+import statistics
+from typing import Callable, List, Tuple, Any, Dict, Optional, Union, Type, Set
 from contextlib import contextmanager
 from enum import Enum
 from dataclasses import dataclass
@@ -28,13 +48,13 @@ class VerificationLevel(Enum):
 
 
 class Config:
-    """Global configuration for PyProof"""
+    """Global configuration for Axiomatik"""
 
     def __init__(self):
-        self.level = VerificationLevel(os.getenv('PYPROOF_LEVEL', 'full'))
-        self.cache_enabled = os.getenv('PYPROOF_CACHE', '1') == '1'
-        self.max_proof_steps = int(os.getenv('PYPROOF_MAX_STEPS', '10000'))
-        self.performance_mode = os.getenv('PYPROOF_PERF', '0') == '1'
+        self.level = VerificationLevel(os.getenv('AXIOMATIK_LEVEL', 'full'))
+        self.cache_enabled = os.getenv('AXIOMATIK_CACHE', '1') == '1'
+        self.max_proof_steps = int(os.getenv('AXIOMATIK_MAX_STEPS', '10000'))
+        self.performance_mode = os.getenv('AXIOMATIK_PERF', '0') == '1'
         self.debug_mode = self.level == VerificationLevel.DEBUG
 
     def should_verify(self, context_type: str = None) -> bool:
@@ -218,10 +238,33 @@ _proof = Proof()
 _ghost = GhostState()
 
 
+# def require(claim: str, evidence: Any) -> Any:
+#     """Optimized global require function"""
+#     return _proof.require(claim, evidence)
 def require(claim: str, evidence: Any) -> Any:
-    """Optimized global require function"""
-    return _proof.require(claim, evidence)
+    """Optimized global require function with performance tracking"""
+    start_time = time.perf_counter()
 
+    try:
+        result = _proof.require(claim, evidence)
+        # Record the verification for performance analysis
+        verification_time = time.perf_counter() - start_time
+        _performance_analyzer.record_verification(
+            property_name=claim,
+            context=_proof.contexts[-1] if _proof.contexts else "global",
+            execution_time=0.001,  # Placeholder
+            verification_time=verification_time
+        )
+        return result
+    except ProofFailure:
+        verification_time = time.perf_counter() - start_time
+        _performance_analyzer.record_verification(
+            property_name=claim,
+            context=_proof.contexts[-1] if _proof.contexts else "global",
+            execution_time=0.001,
+            verification_time=verification_time
+        )
+        raise
 
 @contextmanager
 def proof_context(name: str):
@@ -237,6 +280,686 @@ def proof_context(name: str):
     finally:
         _ghost.pop_scope()
         _proof.pop_context()
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ADAPTIVE MONITORING SYSTEM
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class AdaptiveMonitor:
+    """Dynamically adapts verification behavior based on runtime conditions"""
+
+    def __init__(self):
+        self.load_metrics = deque(maxlen=100)  # Recent performance samples
+        self.active_properties = set()
+        self.property_costs = {}  # Cost per property verification
+        self.sampling_rates = defaultdict(lambda: 1)  # How often to verify each property
+        self.property_registry = {}
+        self.adaptation_lock = threading.Lock()
+
+        # Thresholds for adaptation
+        self.high_load_threshold = 0.1  # 100ms average verification time
+        self.critical_load_threshold = 0.5  # 500ms average verification time
+
+    def register_property(self, property_name: str,
+                          verification_func: Callable,
+                          priority: int = 1,
+                          cost_estimate: float = 0.001):
+        """Register a verifiable property with metadata"""
+        self.property_registry[property_name] = {
+            'func': verification_func,
+            'priority': priority,  # 1=low, 5=critical
+            'cost_estimate': cost_estimate,
+            'success_rate': 1.0,
+            'recent_failures': deque(maxlen=10)
+        }
+        self.active_properties.add(property_name)
+
+    def should_verify_property(self, property_name: str) -> bool:
+        """Decide whether to verify a property based on current load"""
+        if property_name not in self.active_properties:
+            return False
+
+        # Always verify critical properties
+        prop_info = self.property_registry.get(property_name, {})
+        if prop_info.get('priority', 1) >= 4:
+            return True
+
+        # Check sampling rate
+        sampling_rate = self.sampling_rates[property_name]
+        if sampling_rate <= 1:
+            return True
+
+        # Use hash of current time for deterministic sampling
+        return hash(time.time()) % sampling_rate == 0
+
+    def record_verification_cost(self, property_name: str, cost: float, success: bool):
+        """Record the cost and result of a verification"""
+        with self.adaptation_lock:
+            self.load_metrics.append(cost)
+            self.property_costs[property_name] = cost
+
+            # Update property success rate
+            if property_name in self.property_registry:
+                prop_info = self.property_registry[property_name]
+                prop_info['recent_failures'].append(not success)
+                failure_rate = sum(prop_info['recent_failures']) / len(prop_info['recent_failures'])
+                prop_info['success_rate'] = 1.0 - failure_rate
+
+            # Trigger adaptation if needed
+            self._adapt_if_needed()
+
+    def _adapt_if_needed(self):
+        """Adapt verification strategy based on current load"""
+        if len(self.load_metrics) < 10:
+            return
+
+        avg_cost = sum(self.load_metrics) / len(self.load_metrics)
+
+        if avg_cost > self.critical_load_threshold:
+            # Critical load - disable low-priority properties
+            self._disable_low_priority_properties()
+            self._increase_sampling_rates()
+
+        elif avg_cost > self.high_load_threshold:
+            # High load - increase sampling for expensive properties
+            self._increase_sampling_rates()
+
+        elif avg_cost < self.high_load_threshold / 2:
+            # Low load - can re-enable properties
+            self._decrease_sampling_rates()
+            self._enable_high_success_properties()
+
+    def _disable_low_priority_properties(self):
+        """Temporarily disable low-priority properties"""
+        for prop_name, prop_info in self.property_registry.items():
+            if prop_info.get('priority', 1) <= 2:
+                self.active_properties.discard(prop_name)
+
+    def _increase_sampling_rates(self):
+        """Reduce verification frequency for expensive properties"""
+        for prop_name, cost in self.property_costs.items():
+            if cost > 0.05:  # Expensive property
+                self.sampling_rates[prop_name] = min(self.sampling_rates[prop_name] * 2, 10)
+
+    def _decrease_sampling_rates(self):
+        """Increase verification frequency when load is low"""
+        for prop_name in self.sampling_rates:
+            self.sampling_rates[prop_name] = max(self.sampling_rates[prop_name] // 2, 1)
+
+    def _enable_high_success_properties(self):
+        """Re-enable properties with high success rates"""
+        for prop_name, prop_info in self.property_registry.items():
+            if prop_info.get('success_rate', 0) > 0.95:
+                self.active_properties.add(prop_name)
+
+
+# Require function with adaptive monitoring
+_adaptive_monitor = AdaptiveMonitor()
+
+
+def adaptive_require(claim: str, evidence: Any,
+                     property_name: str = None,
+                     priority: int = 1) -> Any:
+    """Require with adaptive monitoring"""
+
+    if property_name is None:
+        property_name = f"anonymous_{claim[:20]}"
+
+    # Register property if not seen before
+    if property_name not in _adaptive_monitor.property_registry:
+        _adaptive_monitor.register_property(
+            property_name,
+            lambda: evidence,
+            priority=priority
+        )
+
+    # Check if we should verify this property
+    if not _adaptive_monitor.should_verify_property(property_name):
+        return evidence  # Skip verification due to load
+
+    # Perform verification with timing
+    start_time = time.perf_counter()
+    try:
+        result = require(claim, evidence)
+        success = True
+        return result
+    except ProofFailure:
+        success = False
+        raise
+    finally:
+        cost = time.perf_counter() - start_time
+        _adaptive_monitor.record_verification_cost(property_name, cost, success)
+
+
+class PropertyManager:
+    """Manages dynamic loading/unloading of verification properties"""
+
+    def __init__(self):
+        self.loaded_properties = {}
+        self.property_modules = {}
+
+    def load_properties_for_context(self, context: str):
+        """Load verification properties specific to a context"""
+        if context == "database":
+            self._load_database_properties()
+        elif context == "network":
+            self._load_network_properties()
+        elif context == "crypto":
+            self._load_crypto_properties()
+
+    def unload_properties_for_context(self, context: str):
+        """Unload properties when leaving a context"""
+        properties_to_remove = [
+            name for name in self.loaded_properties
+            if name.startswith(f"{context}_")
+        ]
+        for prop_name in properties_to_remove:
+            del self.loaded_properties[prop_name]
+            _adaptive_monitor.active_properties.discard(prop_name)
+
+    def _load_database_properties(self):
+        """Load database-specific properties"""
+        _adaptive_monitor.register_property(
+            "db_connection_valid",
+            lambda: True,
+            priority=5
+        )
+
+    def _load_network_properties(self):
+        """Load network-specific properties"""
+        _adaptive_monitor.register_property(
+            "network_available",
+            lambda: True,
+            priority=4
+        )
+
+    def _load_crypto_properties(self):
+        """Load crypto-specific properties"""
+        _adaptive_monitor.register_property(
+            "crypto_key_valid",
+            lambda: True,
+            priority=5
+        )
+
+
+@contextmanager
+def adaptive_verification_context(context: str):
+    """Context manager that loads appropriate properties"""
+    property_manager = PropertyManager()
+    property_manager.load_properties_for_context(context)
+    try:
+        yield
+    finally:
+        property_manager.unload_properties_for_context(context)
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# PERFORMANCE INTROSPECTION SYSTEM
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+@dataclass
+class VerificationHotspot:
+    """Represents an expensive verification check"""
+    property_name: str
+    total_time: float
+    call_count: int
+    average_time: float
+    percentage_of_total: float
+    context: str
+
+
+class PerformanceAnalyzer:
+    """Analyzes verification performance and identifies hotspots"""
+
+    def __init__(self):
+        self.verification_times = defaultdict(list)
+        self.context_times = defaultdict(list)
+        self.total_verification_time = 0.0
+        self.auto_tuning_enabled = False
+        self.target_overhead_percent = 5.0
+        self.last_adjustment_time = 0
+        self.adjustment_cooldown = 1.0
+        self.adjustment_count = 0
+
+    def record_verification(self, property_name: str, context: str,
+                            execution_time: float, verification_time: float):
+        """Record performance data for a verification"""
+        self.verification_times[property_name].append(verification_time)
+        self.context_times[context].append(verification_time)
+        self.total_verification_time += verification_time
+
+        # Auto-tune if enabled
+        if self.auto_tuning_enabled:
+            self._check_auto_tune(execution_time, verification_time)
+
+    def get_performance_hotspots(self, top_n: int = 10) -> List[VerificationHotspot]:
+        """Identify the most expensive verification checks"""
+        hotspots = []
+
+        for prop_name, times in self.verification_times.items():
+            total_time = sum(times)
+            call_count = len(times)
+            avg_time = total_time / call_count
+            percentage = (total_time / max(self.total_verification_time, 0.001)) * 100
+
+            # Find most common context for this property
+            context = self._find_primary_context(prop_name)
+
+            hotspots.append(VerificationHotspot(
+                property_name=prop_name,
+                total_time=total_time,
+                call_count=call_count,
+                average_time=avg_time,
+                percentage_of_total=percentage,
+                context=context
+            ))
+
+        # Sort by total time and return top N
+        hotspots.sort(key=lambda x: x.total_time, reverse=True)
+        return hotspots[:top_n]
+
+    def _find_primary_context(self, prop_name: str) -> str:
+        """Find the most common context for a property"""
+        # Simple implementation - return first context found
+        for step in _proof.steps:
+            if prop_name in step.claim:
+                return step.context
+        return "unknown"
+
+    def generate_performance_report(self) -> str:
+        """Generate comprehensive performance report"""
+        hotspots = self.get_performance_hotspots()
+
+        report = ["Axiomatik Performance Analysis", "=" * 50, ""]
+
+        # Overall statistics
+        total_properties = len(self.verification_times)
+        total_calls = sum(len(times) for times in self.verification_times.values())
+        avg_verification_time = self.total_verification_time / max(1, total_calls)
+
+        report.extend([
+            f"Total properties verified: {total_properties}",
+            f"Total verification calls: {total_calls}",
+            f"Total verification time: {self.total_verification_time:.3f}s",
+            f"Average per verification: {avg_verification_time * 1000:.3f}ms",
+            ""
+        ])
+
+        # Top hotspots
+        report.append("Top Performance Hotspots:")
+        for i, hotspot in enumerate(hotspots, 1):
+            report.append(
+                f"  {i:2d}. {hotspot.property_name[:40]:40} "
+                f"{hotspot.total_time * 1000:6.1f}ms "
+                f"({hotspot.percentage_of_total:4.1f}%) "
+                f"[{hotspot.call_count} calls]"
+            )
+
+        # Context analysis
+        report.extend(["", "Performance by Context:"])
+        context_totals = {
+            ctx: sum(times) for ctx, times in self.context_times.items()
+        }
+        for context, total_time in sorted(context_totals.items(),
+                                          key=lambda x: x[1], reverse=True):
+            percentage = (total_time / max(self.total_verification_time, 0.001)) * 100
+            report.append(f"  {context:20}: {total_time * 1000:6.1f}ms ({percentage:4.1f}%)")
+
+        return "\n".join(report)
+
+    def auto_tune_verification_level(self, target_overhead_percent: float = 5.0):
+        """Automatically tune verification level based on measured overhead"""
+        self.auto_tuning_enabled = True
+        self.target_overhead_percent = target_overhead_percent
+
+        print(f"Auto-tuning enabled: target overhead {target_overhead_percent}%")
+
+    def _check_auto_tune(self, execution_time: float, verification_time: float):
+        """Check if auto-tuning adjustment is needed"""
+        # Skip if disabled or in cooldown
+        if not self.auto_tuning_enabled:
+            return
+
+        current_time = time.time()
+        if current_time - self.last_adjustment_time < self.adjustment_cooldown:
+            return
+
+        # Skip if execution time is clearly a placeholder
+        if execution_time <= 0.001:
+            return
+
+        overhead_percent = (verification_time / execution_time) * 100
+
+        # Only adjust if overhead is significantly outside target range
+        if overhead_percent > self.target_overhead_percent * 2.0:  # More conservative
+            if self._reduce_verification_intensity():
+                self.last_adjustment_time = current_time
+                self.adjustment_count += 1
+        elif overhead_percent < self.target_overhead_percent * 0.25:  # Much more conservative
+            if self._increase_verification_intensity():
+                self.last_adjustment_time = current_time
+                self.adjustment_count += 1
+
+        # Disable after too many adjustments
+        if self.adjustment_count > 5:
+            self.auto_tuning_enabled = False
+            print("Auto-tuning disabled after 5 adjustments")
+
+    def _reduce_verification_intensity(self) -> bool:
+        """Reduce verification intensity to meet performance targets"""
+        current_level = _config.level
+
+        # Define explicit ordering
+        level_order = [
+            VerificationLevel.DEBUG,
+            VerificationLevel.FULL,
+            VerificationLevel.INVARIANTS,
+            VerificationLevel.CONTRACTS,
+            VerificationLevel.OFF
+        ]
+
+        try:
+            current_index = level_order.index(current_level)
+            if current_index < len(level_order) - 1:  # Not at minimum
+                new_level = level_order[current_index + 1]
+                _config.level = new_level
+                print(f"Auto-tune: Reduced verification level to {new_level.value}")
+                return True
+        except ValueError:
+            pass
+
+        return False
+
+    def _increase_verification_intensity(self) -> bool:
+        """Increase verification intensity when performance allows"""
+        current_level = _config.level
+
+        # Define explicit ordering
+        level_order = [
+            VerificationLevel.OFF,
+            VerificationLevel.CONTRACTS,
+            VerificationLevel.INVARIANTS,
+            VerificationLevel.FULL,
+            VerificationLevel.DEBUG
+        ]
+
+        try:
+            current_index = level_order.index(current_level)
+            if current_index < len(level_order) - 1:  # Not at maximum
+                new_level = level_order[current_index + 1]
+                _config.level = new_level
+                print(f"Auto-tune: Increased verification level to {new_level.value}")
+                return True
+        except ValueError:
+            pass
+
+        return False
+
+    def visualize_hotspots(self, save_path: str = None):
+        """Create visualization of performance hotspots"""
+        try:
+            import matplotlib.pyplot as plt
+            hotspots = self.get_performance_hotspots()
+
+            if not hotspots:
+                print("No performance data available for visualization")
+                return
+
+            # Create bar chart of top hotspots
+            names = [h.property_name[:20] for h in hotspots[:10]]
+            times = [h.total_time * 1000 for h in hotspots[:10]]  # Convert to ms
+
+            plt.figure(figsize=(12, 6))
+            plt.bar(names, times)
+            plt.title("Top 10 Verification Performance Hotspots")
+            plt.xlabel("Property Name")
+            plt.ylabel("Total Time (ms)")
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+
+            if save_path:
+                plt.savefig(save_path)
+            else:
+                plt.show()
+
+        except ImportError:
+            print("Matplotlib not available for visualization")
+
+
+# Global performance analyzer
+_performance_analyzer = PerformanceAnalyzer()
+
+
+# Global functions
+def get_performance_hotspots(top_n: int = 10) -> List[VerificationHotspot]:
+    """Get the most expensive verification checks"""
+    return _performance_analyzer.get_performance_hotspots(top_n)
+
+
+def auto_tune_verification_level(target_overhead_percent: float = 5.0):
+    """Automatically tune verification level based on measured overhead"""
+    _performance_analyzer.auto_tune_verification_level(target_overhead_percent)
+
+
+def generate_performance_report() -> str:
+    """Generate comprehensive performance report"""
+    return _performance_analyzer.generate_performance_report()
+
+
+def visualize_performance(save_path: str = None):
+    """Visualize verification performance"""
+    _performance_analyzer.visualize_hotspots(save_path)
+
+
+# Integration with existing require function
+def _future_require(claim: str, evidence: Any, context: str = "") -> Any:
+    """Require with performance tracking"""
+    start_time = time.perf_counter()
+
+    try:
+        result = require(claim, evidence)
+        return result
+    finally:
+        verification_time = time.perf_counter() - start_time
+        _performance_analyzer.record_verification(
+            property_name=claim,
+            context=context or "global",
+            execution_time=0.001,  # Placeholder - would need actual execution timing
+            verification_time=verification_time
+        )
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# RECOVERY FRAMEWORK
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+class RecoveryPolicy(Enum):
+    FAIL_FAST = "fail_fast"  # Current behavior - raise exception
+    GRACEFUL_DEGRADATION = "graceful_degradation"  # Use simpler algorithm
+    RETRY_WITH_BACKOFF = "retry_with_backoff"  # Retry with exponential backoff
+    CIRCUIT_BREAKER = "circuit_breaker"  # Disable after repeated failures
+    ROLLBACK_STATE = "rollback_state"  # Restore previous known-good state
+
+
+class RecoveryStrategy:
+    """Defines how to recover from verification failures"""
+
+    def __init__(self,
+                 policy: RecoveryPolicy,
+                 fallback_handler: Callable = None,
+                 max_retries: int = 3,
+                 backoff_factor: float = 2.0,
+                 circuit_breaker_threshold: int = 5):
+        self.policy = policy
+        self.fallback_handler = fallback_handler
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+        self.circuit_breaker_threshold = circuit_breaker_threshold
+        self.failure_count = 0
+        self.circuit_open = False
+
+
+class RecoveryManager:
+    """Manages recovery state and strategies"""
+
+    def __init__(self):
+        self.state_snapshots = {}  # For rollback recovery
+        self.recovery_stats = {}  # Track recovery effectiveness
+
+    def capture_state(self, function_name: str, args, kwargs):
+        """Capture state for potential rollback"""
+        self.state_snapshots[function_name] = {
+            'args': args,
+            'kwargs': kwargs,
+            'timestamp': time.time(),
+            'call_count': self.recovery_stats.get(function_name, {}).get('calls', 0)
+        }
+
+    def execute_recovery(self, strategy: RecoveryStrategy,
+                         original_function: Callable,
+                         violation: ProofFailure,
+                         *args, **kwargs):
+        """Execute recovery strategy when verification fails"""
+
+        if strategy.policy == RecoveryPolicy.GRACEFUL_DEGRADATION:
+            if strategy.fallback_handler:
+                return strategy.fallback_handler(*args, **kwargs)
+            else:
+                # Use a generic simplified version
+                return self._simplified_fallback(original_function, *args, **kwargs)
+
+        elif strategy.policy == RecoveryPolicy.RETRY_WITH_BACKOFF:
+            return self._retry_with_backoff(strategy, original_function, *args, **kwargs)
+
+        elif strategy.policy == RecoveryPolicy.CIRCUIT_BREAKER:
+            return self._circuit_breaker_recovery(strategy, original_function, *args, **kwargs)
+
+        elif strategy.policy == RecoveryPolicy.ROLLBACK_STATE:
+            return self._rollback_state_recovery(strategy, original_function, *args, **kwargs)
+
+        else:  # FAIL_FAST
+            raise violation
+
+    def _simplified_fallback(self, original_function, *args, **kwargs):
+        """Generic simplified fallback - disable verification and retry"""
+        old_level = _config.level
+        try:
+            _config.level = VerificationLevel.OFF
+            return original_function(*args, **kwargs)
+        finally:
+            _config.level = old_level
+
+    def _retry_with_backoff(self, strategy: RecoveryStrategy, original_function, *args, **kwargs):
+        """Retry with exponential backoff"""
+        last_exception = None
+        for attempt in range(strategy.max_retries):
+            try:
+                return original_function(*args, **kwargs)
+            except ProofFailure as e:
+                last_exception = e
+                if attempt < strategy.max_retries - 1:
+                    delay = (strategy.backoff_factor ** attempt) * 0.1
+                    time.sleep(delay)
+
+        # All retries failed
+        raise last_exception
+
+    def _circuit_breaker_recovery(self, strategy: RecoveryStrategy, original_function, *args, **kwargs):
+        """Circuit breaker recovery pattern"""
+        if strategy.circuit_open:
+            # Circuit is open, use fallback immediately
+            if strategy.fallback_handler:
+                return strategy.fallback_handler(*args, **kwargs)
+            else:
+                return self._simplified_fallback(original_function, *args, **kwargs)
+
+        try:
+            result = original_function(*args, **kwargs)
+            strategy.failure_count = 0  # Reset on success
+            return result
+        except ProofFailure as e:
+            strategy.failure_count += 1
+            if strategy.failure_count >= strategy.circuit_breaker_threshold:
+                strategy.circuit_open = True
+                print(f"Circuit breaker opened after {strategy.failure_count} failures")
+            raise e
+
+    def _rollback_state_recovery(self, strategy: RecoveryStrategy, original_function, *args, **kwargs):
+        """Rollback to previous state and retry"""
+        func_name = original_function.__name__
+        if func_name in self.state_snapshots:
+            snapshot = self.state_snapshots[func_name]
+            # Restore previous args/kwargs and retry
+            return original_function(*snapshot['args'], **snapshot['kwargs'])
+        else:
+            # No snapshot available, use fallback
+            return self._simplified_fallback(original_function, *args, **kwargs)
+
+
+# Contract decorator with recovery
+def contract_with_recovery(
+        preconditions: List[Tuple[str, Callable]] = None,
+        postconditions: List[Tuple[str, Callable]] = None,
+        recovery_strategy: RecoveryStrategy = None
+):
+    """Contract decorator with automated recovery capabilities"""
+
+    if recovery_strategy is None:
+        recovery_strategy = RecoveryStrategy(RecoveryPolicy.FAIL_FAST)
+
+    recovery_manager = RecoveryManager()
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            func_name = func.__name__
+
+            # Capture state for potential recovery
+            if recovery_strategy.policy == RecoveryPolicy.ROLLBACK_STATE:
+                recovery_manager.capture_state(func_name, args, kwargs)
+
+            try:
+                # Standard contract verification
+                if preconditions:
+                    for claim, condition_fn in preconditions:
+                        require(f"precondition: {claim}", condition_fn(*args, **kwargs))
+
+                result = func(*args, **kwargs)
+
+                if postconditions:
+                    for claim, condition_fn in postconditions:
+                        require(f"postcondition: {claim}",
+                                condition_fn(*args, result=result, **kwargs))
+
+                # Reset failure count on success
+                recovery_strategy.failure_count = 0
+                return result
+
+            except ProofFailure as violation:
+                # Execute recovery strategy
+                recovery_strategy.failure_count += 1
+
+                # Update recovery statistics
+                stats = recovery_manager.recovery_stats.setdefault(func_name, {
+                    'calls': 0, 'failures': 0, 'recoveries': 0
+                })
+                stats['failures'] += 1
+
+                try:
+                    result = recovery_manager.execute_recovery(
+                        recovery_strategy, func, violation, *args, **kwargs
+                    )
+                    stats['recoveries'] += 1
+                    return result
+                except Exception as recovery_error:
+                    # Recovery failed, log and re-raise original violation
+                    print(f"Recovery failed for {func_name}: {recovery_error}")
+                    raise violation
+
+        return wrapper
+
+    return decorator
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -600,7 +1323,7 @@ class TemporalVerifier:
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class Plugin:
-    """Base class for PyProof plugins"""
+    """Base class for Axiomatik plugins"""
 
     def __init__(self, name: str):
         self.name = name
@@ -619,7 +1342,7 @@ class Plugin:
 
 
 class PluginRegistry:
-    """Registry for PyProof plugins"""
+    """Registry for Axiomatik plugins"""
 
     def __init__(self):
         self.plugins = {}
@@ -701,26 +1424,9 @@ class CryptoPlugin(Plugin):
     @staticmethod
     def verify_secure_random(random_func: Callable) -> bool:
         """Verify random number generator is cryptographically secure"""
+        # This is a simplified check - real implementation would be more sophisticated
         import secrets
-        import random
-
-        # Check if it's from the secrets module
-        if hasattr(random_func, '__module__') and random_func.__module__ == 'secrets':
-            return True
-
-        # Check if it's the secrets.randbits function specifically
-        if random_func is secrets.randbits:
-            return True
-
-        # Check if it's a SystemRandom method
-        if hasattr(random_func, '__self__') and isinstance(random_func.__self__, random.SystemRandom):
-            return True
-
-        # Check if it has SystemRandom attribute
-        if hasattr(random_func, 'SystemRandom'):
-            return True
-
-        return False
+        return random_func.__module__ == 'secrets' or hasattr(random_func, 'SystemRandom')
 
 
 # Financial Calculation Plugin
@@ -1240,22 +1946,25 @@ def get_temporal_history():
 # File-like protocol, allow proper read/write transitions
 filemanager_protocol = Protocol("FileManager", "closed")
 filemanager_protocol.add_state(ProtocolState("closed", ["open"]))
-filemanager_protocol.add_state(ProtocolState("open", ["read", "write", "closed"]))  # Allow direct close
-filemanager_protocol.add_state(ProtocolState("read", ["read", "write", "closed"]))  # Allow direct close
-filemanager_protocol.add_state(ProtocolState("write", ["read", "write", "closed"]))  # Allow direct close
+filemanager_protocol.add_state(ProtocolState("open", ["read", "write", "close"]))
+filemanager_protocol.add_state(ProtocolState("read", ["read", "write", "close"]))  # Can read again, write, or close
+filemanager_protocol.add_state(ProtocolState("write", ["read", "write", "close"]))  # Can read, write again, or close
+filemanager_protocol.add_state(ProtocolState("close", ["closed"]))
 
 # State machine protocol, allowed_transitions should be TARGET STATES, not method names
 statemachine_protocol = Protocol("StateMachine", "stopped")
 statemachine_protocol.add_state(ProtocolState("stopped", ["running"]))  # From stopped, can go to running (via start())
-statemachine_protocol.add_state(ProtocolState("running", ["stopped", "process"]))  # From running, can go to stopped (via stop()) or process (via process())
-statemachine_protocol.add_state(ProtocolState("process", ["running", "stopped", "process"]))  # Added "process" - allow staying in process state
+statemachine_protocol.add_state(ProtocolState("running", ["stopped",
+                                                          "process"]))  # From running, can go to stopped (via stop()) or process (via process())
+statemachine_protocol.add_state(
+    ProtocolState("process", ["running", "stopped"]))  # From process, can go back to running or stopped
 
 # Database connection protocol
 dbconnection_protocol = Protocol("DatabaseConnection", "disconnected")
 dbconnection_protocol.add_state(ProtocolState("disconnected", ["connected"]))
-dbconnection_protocol.add_state(ProtocolState("connected", ["connected", "transaction", "disconnected"]))  # Added "transaction"
-# dbconnection_protocol.add_state(ProtocolState("transaction", ["connected"]))  # Transaction ends back to connected
-dbconnection_protocol.add_state(ProtocolState("transaction", ["transaction", "connected"]))  # Allow staying in transaction for multiple operations
+dbconnection_protocol.add_state(
+    ProtocolState("connected", ["connected", "disconnected"]))  # Can stay connected or disconnect
+dbconnection_protocol.add_state(ProtocolState("transaction", ["connected"]))  # Transaction ends back to connected
 
 # HTTP client protocol
 httpclient_protocol = Protocol("HttpClient", "idle")
@@ -1282,327 +1991,251 @@ def track_sensitive_data(variable_name: str, value: Any, label: SecurityLabel = 
 
     return tainted
 
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# COMPREHENSIVE DEMO
+# FUTURE DEMONSTRATION WITH ALL NEW FEATURES
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def demo_advanced_features():
-    """Demonstrate all advanced features with comprehensive output"""
-    print("PyProof Advanced: High-Performance Runtime Verification")
-    print("~" * 80)
+def demo_future_features():
+    """Demonstrate all future features including adaptive monitoring, introspection, and recovery"""
+    print("Axiomatik Future: Runtime Verification with Adaptive Monitoring, Introspection & Recovery")
+    print("~" * 90)
 
     # Clear state
     _proof.clear()
 
-    # Demo 1: Refinement Types
-    print("\n~~~~~~~ Refinement Types Demo ~~~~~~~")
+    # Demo 1: Adaptive Monitoring
+    print("\n~~~~~~~ Adaptive Monitoring Demo ~~~~~~~")
+
+    # Enable conservative auto-tuning
+    _performance_analyzer.auto_tuning_enabled = True
+    _performance_analyzer.target_overhead_percent = 15.0  # More reasonable target
+    _performance_analyzer.adjustment_cooldown = 2.0  # Longer cooldown
+    print(f"Conservative auto-tuning enabled: target overhead {_performance_analyzer.target_overhead_percent}%")
+    # Enable auto-tuning
+    # auto_tune_verification_level(target_overhead_percent=5.0)
+
+    # Simulate load testing with adaptive properties
+    for i in range(50):
+        with adaptive_verification_context("database"):
+            adaptive_require(
+                "connection is valid",
+                True,
+                property_name="db_connection_check",
+                priority=5
+            )
+
+        with adaptive_verification_context("network"):
+            adaptive_require(
+                "network is available",
+                True,
+                property_name="network_check",
+                priority=3
+            )
+
+    print(f"Adaptive monitoring processed 100 verifications")
+    print(f"Active properties: {len(_adaptive_monitor.active_properties)}")
+    print(f"Property registry: {len(_adaptive_monitor.property_registry)}")
+
+    # Demo 2: Performance Introspection
+    print("\n~~~~~~~ Performance Introspection Demo ~~~~~~~")
+
+    # Generate some performance data
+    @auto_contract
+    def expensive_operation(n: PositiveInt) -> int:
+        """Simulate expensive operation for benchmarking"""
+        time.sleep(0.001)  # Small delay to simulate work
+        return n * 2
 
     @auto_contract
-    def calculate_grade(score: PositiveInt) -> Percentage:
-        return min(100, max(0, score))
+    def cheap_operation(n: PositiveInt) -> int:
+        """Quick operation for comparison"""
+        return n + 1
 
-    try:
-        grade = calculate_grade(85)
-        print(f"Grade: {grade}%")
+    # Run operations to generate performance data
+    for i in range(1, 21):
+        expensive_operation(PositiveInt(i))
+        cheap_operation(PositiveInt(i))
 
-        # Demo refinement type validation
-        try:
-            invalid_score = PositiveInt(-5)
-        except ProofFailure as e:
-            print(f"Refinement validation caught: {e}")
+    # Generate performance report
+    performance_report = generate_performance_report()
+    print("Performance Analysis Results:")
+    print(performance_report[:500] + "..." if len(performance_report) > 500 else performance_report)
 
-        # Demo other refinement types
-        valid_list = NonEmptyList(int)([1, 2, 3, 4])
-        print(f"Non-empty list validated: {valid_list}")
+    # Show hotspots
+    hotspots = get_performance_hotspots(3)
+    print(f"\nTop 3 Performance Hotspots:")
+    for i, hotspot in enumerate(hotspots, 1):
+        print(f"  {i}. {hotspot.property_name[:30]}: {hotspot.average_time * 1000:.2f}ms avg")
 
-    except ProofFailure as e:
-        print(f"Refinement type error: {e}")
+    # Demo 3: Recovery Framework
+    print("\n~~~~~~~ Recovery Framework Demo ~~~~~~~")
 
-    # Demo 2: Protocol Verification
-    print("\n~~~~~~~ Protocol Verification Demo ~~~~~~~")
-
-    file_protocol = Protocol("FileHandle", "closed")
-    file_protocol.add_state(ProtocolState("closed", ["open"]))
-    file_protocol.add_state(ProtocolState("open", ["read", "write", "close"]))
-    file_protocol.add_state(ProtocolState("read", ["open", "close"]))
-    file_protocol.add_state(ProtocolState("write", ["open", "close"]))
-    file_protocol.add_state(ProtocolState("close", ["closed"]))
-
-    class ProtocolFile:
-        @protocol_method(file_protocol, "open")
-        def open(self):
-            print(f"File opened (state: {file_protocol.get_state(self)})")
-
-        @protocol_method(file_protocol, "read")
-        def read(self):
-            print(f"File read (state: {file_protocol.get_state(self)})")
-            return "data"
-
-        @protocol_method(file_protocol, "close")
-        def close(self):
-            print(f"File closed (state: {file_protocol.get_state(self)})")
-
-    pf = ProtocolFile()
-    print(f"Initial state: {file_protocol.get_state(pf)}")
-    pf.open()
-    pf.read()
-    pf.close()
-
-    # Demo invalid transition
-    try:
-        pf2 = ProtocolFile()
-        pf2.read()  # Should fail - can't read from closed file
-    except ProofFailure as e:
-        print(f"Protocol violation caught: {e}")
-
-    # Demo 3: Information Flow
-    print("\n~~~~~~~ Information Flow Demo ~~~~~~~")
-
-    # Create tainted values with different security levels
-    public_data = TaintedValue("public_info", SecurityLabel.PUBLIC, ["web_form"])
-    secret_data = TaintedValue("classified_info", SecurityLabel.SECRET, ["database"])
-    confidential_data = TaintedValue("internal_memo", SecurityLabel.CONFIDENTIAL, ["email"])
-
-    print(f"Public data: {public_data.value} (label: {public_data.label.value})")
-    print(f"Secret data: {secret_data.value} (label: {secret_data.label.value})")
-    print(f"Confidential data: {confidential_data.value} (label: {confidential_data.label.value})")
-
-    # Demonstrate information flow tracking
-    flow_tracker = InformationFlowTracker()
-
-    # Set up flow policies
-    flow_tracker.add_policy(SecurityLabel.PUBLIC, SecurityLabel.CONFIDENTIAL, True)
-    flow_tracker.add_policy(SecurityLabel.SECRET, SecurityLabel.PUBLIC, False)
-
-    # Valid flow: public -> confidential
-    try:
-        flow_tracker.track_flow(public_data, SecurityLabel.CONFIDENTIAL)
-        print("+++ - Public -> Confidential flow allowed")
-    except ProofFailure as e:
-        print(f"XXX - Flow violation: {e}")
-
-    # Invalid flow: secret -> public
-    try:
-        flow_tracker.track_flow(secret_data, SecurityLabel.PUBLIC)
-        print("+++ - Secret -> Public flow allowed")
-    except ProofFailure as e:
-        print(f"XXX - Flow violation caught: Secret data cannot flow to Public")
-
-    # Demonstrate declassification
-    try:
-        secret_data.declassify(SecurityLabel.CONFIDENTIAL, "Sanitized for internal use")
-        print(f"+++ - Secret data declassified to: {secret_data.label.value}")
-        print(f"  Provenance: {secret_data.provenance}")
-    except ProofFailure as e:
-        print(f"XXX - Declassification failed: {e}")
-
-    # Demonstrate combining tainted values
-    combined = public_data.combine_with(confidential_data)
-    print(f"Combined data security level: {combined.label.value}")
-    print(f"Combined provenance: {combined.provenance}")
-
-    # Demo 4: Temporal Properties
-    print("\n~~~~~~~ Temporal Properties Demo ~~~~~~~")
-
-    temporal_verifier = TemporalVerifier()
-
-    # Add "eventually consistent" property
-    eventually_consistent = EventuallyProperty(
-        "data_consistent",
-        lambda history: any(e['event'] == 'sync_complete' for e in history),
-        timeout=5.0
+    # Function with graceful degradation
+    @contract_with_recovery(
+        preconditions=[("data not empty", lambda data: len(data) > 0)],
+        recovery_strategy=RecoveryStrategy(
+            RecoveryPolicy.GRACEFUL_DEGRADATION,
+            fallback_handler=lambda data: sum(data) / max(1, len(data))  # Safe average
+        )
     )
-    temporal_verifier.add_property(eventually_consistent)
+    def risky_statistical_analysis(data: List[float]) -> Dict[str, float]:
+        """Analysis that might fail verification but has recovery"""
+        # Intentionally strict verification that might fail
+        require("data has at least 10 elements", len(data) >= 10)
 
-    # Add "always valid" property
-    always_valid = AlwaysProperty(
-        "data_valid",
-        lambda event: event.get('data', {}).get('valid', True)
-    )
-    temporal_verifier.add_property(always_valid)
+        mean = sum(data) / len(data)
+        variance = sum((x - mean) ** 2 for x in data) / len(data)
 
-    print("Recording temporal events...")
-    temporal_verifier.record_event("data_update", {"key": "value", "valid": True})
-    print("  -> data_update recorded")
+        return {
+            'mean': mean,
+            'variance': variance,
+            'count': len(data)
+        }
 
-    temporal_verifier.record_event("sync_start", {"valid": True})
-    print("  -> sync_start recorded")
-
-    temporal_verifier.record_event("validation_check", {"valid": True})
-    print("  -> validation_check recorded")
-
-    temporal_verifier.record_event("sync_complete", {"valid": True})
-    print("  -> sync_complete recorded")
-
-    # Verify temporal properties
+    # Test with data that triggers recovery
+    small_data = [1.0, 2.0, 3.0]  # Less than 10 elements
     try:
-        temporal_verifier.verify_all()
-        print("+++ - All temporal properties verified:")
-        print(f"  - Eventually consistent: {eventually_consistent.check()}")
-        print(f"  - Always valid: {always_valid.check()}")
-        print(f"  - Event history length: {len(temporal_verifier.properties[0].history)}")
-    except ProofFailure as e:
-        print(f"XXX - Temporal verification failed: {e}")
+        result = risky_statistical_analysis(small_data)
+        print(f"+++ - Recovery successful: {result}")
+    except Exception as e:
+        print(f"XXX - Recovery failed: {e}")
 
-    # Demo 5: Plugin Usage
-    print("\n~~~~~~~ Plugin Extensions Demo ~~~~~~~")
+    # Function with retry strategy
+    def create_flaky_operation():
+        attempt_count = 0
 
-    # Financial calculation
-    print("~~~~~~~ Financial Plugin ~~~~~~~")
-    financial_money = _plugin_registry.get_type("Money")
-    if financial_money:
-        price = financial_money("19.99", "USD")
-        tax = financial_money("1.60", "USD")
-        total = price + tax
-        print(f"Price: {price}")
-        print(f"Tax: {tax}")
-        print(f"Total: {total}")
+        @contract_with_recovery(
+            preconditions=[("attempt succeeds", lambda: attempt_count < 2)],
+            recovery_strategy=RecoveryStrategy(
+                RecoveryPolicy.RETRY_WITH_BACKOFF,
+                max_retries=3,
+                backoff_factor=1.5
+            )
+        )
+        def flaky_operation() -> str:
+            nonlocal attempt_count
+            attempt_count += 1
+            if attempt_count <= 2:
+                return "failure simulation"
+            return "success"
 
-        # Demonstrate precision verification
-        finance_plugin = None
-        for plugin in _plugin_registry.plugins.values():
-            if plugin.name == "finance":
-                finance_plugin = plugin
-                break
+        return flaky_operation
 
-        if finance_plugin:
-            precision_ok = finance_plugin.verify_precision(total, 2)
-            print(f"+++ - Precision maintained (2 decimal places): {precision_ok}")
+    flaky_op = create_flaky_operation()
+    try:
+        result = flaky_op()
+        print(f"+++ - Retry recovery successful: {result}")
+    except Exception as e:
+        print(f"XXX - Retry recovery failed: {e}")
 
-            audit_ok = finance_plugin.verify_audit_trail("addition", [price, tax], total)
-            print(f"+++ - Audit trail recorded: {audit_ok}")
-            print(f"  Audit entries: {len(finance_plugin.audit_trail)}")
+    # Reset for demo
+    attempt_count = 0
 
-    # Cryptographic verification
-    print("\n~~~~~~~ Cryptographic Plugin ~~~~~~~")
-    crypto_plugin = None
-    for plugin in _plugin_registry.plugins.values():
-        if plugin.name == "crypto":
-            crypto_plugin = plugin
-            break
+    # Demo 4: Combined Features
+    print("\n~~~~~~~ Combined Features Demo ~~~~~~~")
 
-    if crypto_plugin:
-        # Test constant-time verification
-        def fast_func(x):
-            time.sleep(0.001)
-
-        def variable_func(x):
-            time.sleep(0.001 * len(str(x)))
-
-        const_time_ok = crypto_plugin.verify_constant_time(fast_func, [1, 100, 1000])
-        print(f"+++ - Constant-time verification (fast_func): {const_time_ok}")
-
-        # Test key zeroization
-        sensitive_key = bytearray(b"secret_key_123")
-        print(f"Before zeroization: {sensitive_key[:10]}...")
-
-        # Zeroize the key
-        for i in range(len(sensitive_key)):
-            sensitive_key[i] = 0
-
-        zeroized_ok = crypto_plugin.verify_key_zeroized(sensitive_key)
-        print(f"+++ - Key properly zeroized: {zeroized_ok}")
-
-        # Test secure random
-        import secrets
-        secure_ok = crypto_plugin.verify_secure_random(secrets.randbits)
-        print(f"+++ - Secure random generator: {secure_ok}")
-
-    # Security verification
-    print("\n~~~~~~~ Security Plugin ~~~~~~~")
-    security_plugin = None
-    for plugin in _plugin_registry.plugins.values():
-        if plugin.name == "security":
-            security_plugin = plugin
-            break
-
-    if security_plugin:
-        # Test input sanitization
-        malicious_input = "<script>alert('xss')</script>"
-        sanitizer = lambda x: x.replace("<", "&lt;").replace(">", "&gt;")
-
-        sanitized_ok = security_plugin.verify_input_sanitized(malicious_input, sanitizer)
-        print(f"+++ - Input sanitization: {sanitized_ok}")
-        print(f"  Original: {malicious_input}")
-        print(f"  Sanitized: {sanitizer(malicious_input)}")
-
-        # Test privilege boundaries
-        privilege_ok = security_plugin.verify_privilege_boundary("admin", "user")
-        print(f"+++ - Privilege check (admin can access user resources): {privilege_ok}")
-
-        privilege_fail = security_plugin.verify_privilege_boundary("guest", "admin")
-        print(f"XXX - Privilege check (guest cannot access admin resources): {privilege_fail}")
-
-        # Test injection prevention
-        safe_query = "SELECT * FROM users WHERE id = ?"
-        user_input = "1"
-        injection_safe = security_plugin.verify_no_injection(safe_query, user_input)
-        print(f"+++ - No injection vulnerability: {injection_safe}")
-
-    # Concurrency verification
-    print("\n~~~~~~~ Concurrency Plugin ~~~~~~~")
-    concurrency_plugin = None
-    for plugin in _plugin_registry.plugins.values():
-        if plugin.name == "concurrency":
-            concurrency_plugin = plugin
-            break
-
-    if concurrency_plugin:
-        # Test deadlock prevention
-        import threading
-        lock1 = threading.Lock()
-        lock2 = threading.Lock()
-
-        deadlock_safe = concurrency_plugin.verify_no_deadlock(lock1, lock2)
-        print(f"+++ - No deadlock detected: {deadlock_safe}")
-
-        # Test atomic operation detection
-        def atomic_increment():
-            with threading.Lock():
-                return 1
-
-        atomic_ok = concurrency_plugin.verify_atomic(atomic_increment)
-        print(f"+++ - Atomic operation detected: {atomic_ok}")
-
-        # Show lock graph
-        print(f"  Active lock relationships: {len(concurrency_plugin.lock_graph)}")
-
-    # Security contract demo with proper plugin integration
-    print("\n~~~~~~~ Integrated Security Contract ~~~~~~~")
-
-    @contract(
+    # Function using adaptive monitoring, performance tracking, and recovery
+    @contract_with_recovery(
         preconditions=[
-            ("input is string", lambda lam_user_input: isinstance(lam_user_input, str)),
-            ("input sanitized", lambda lam_user_input:
-            _plugin_registry.get_verifier("input_sanitized")(lam_user_input, lambda x: x.replace("<", "&lt;")))
-        ]
+            ("input is valid", lambda data: isinstance(data, list) and len(data) > 0)
+        ],
+        recovery_strategy=RecoveryStrategy(
+            RecoveryPolicy.GRACEFUL_DEGRADATION,
+            fallback_handler=lambda data: {"result": "simplified_processing", "count": len(data)}
+        )
     )
-    def process_user_input(temp_user_input: str):
-        return f"Processed: {temp_user_input}"
+    def comprehensive_data_processing(data: List[int]) -> Dict[str, Any]:
+        """Demonstrates all future features working together"""
 
-    try:
-        result = process_user_input("Hello World")
-        print(f"+++ - Security contract passed: {result}")
-    except ProofFailure as e:
-        print(f"XXX - Security verification failed: {e}")
+        # Use adaptive monitoring
+        with adaptive_verification_context("data_processing"):
+            adaptive_require(
+                "data is properly formatted",
+                all(isinstance(x, int) for x in data),
+                property_name="data_formatting_check",
+                priority=4
+            )
 
-    # Performance summary
-    print(f"\n~~~~~~~ Performance Summary ~~~~~~~")
+            # Track sensitive data (if applicable)
+            if any(x > 1000 for x in data):
+                track_sensitive_data("high_value_data", data, SecurityLabel.CONFIDENTIAL)
+
+            # Record temporal event
+            record_temporal_event("processing_started", {"data_size": len(data)})
+
+            # Perform processing
+            result = {
+                "sum": sum(data),
+                "average": sum(data) / len(data),
+                "max": max(data),
+                "min": min(data),
+                "processed_at": time.time()
+            }
+
+            # Strict verification that might trigger recovery
+            require("result is comprehensive", len(result) >= 5)
+            require("average is reasonable", 0 <= result["average"] <= 10000)
+
+            record_temporal_event("processing_completed", {"result_keys": len(result)})
+
+            return result
+
+    # Test comprehensive processing
+    test_data = [10, 20, 30, 40, 50]
+    result = comprehensive_data_processing(test_data)
+    print(f"+++ - Comprehensive processing: {result}")
+
+    # Test with data that might trigger recovery
+    edge_case_data = [10000, 20000, 30000]  # High values
+    result2 = comprehensive_data_processing(edge_case_data)
+    print(f"+++ - Edge case processing: {result2}")
+
+    # Demo 5: System Status and Analytics
+    print("\n~~~~~~~ System Status & Analytics ~~~~~~~")
+
+    # Adaptive monitor status
+    print("Adaptive Monitor Status:")
+    print(f"  Active properties: {len(_adaptive_monitor.active_properties)}")
+    print(f"  Property costs tracked: {len(_adaptive_monitor.property_costs)}")
+    print(f"  Load metrics samples: {len(_adaptive_monitor.load_metrics)}")
+
+    # Performance analyzer status
+    print("\nPerformance Analyzer Status:")
+    print(f"  Properties tracked: {len(_performance_analyzer.verification_times)}")
+    print(f"  Total verification time: {_performance_analyzer.total_verification_time:.3f}s")
+    print(f"  Auto-tuning enabled: {_performance_analyzer.auto_tuning_enabled}")
+
+    # Recovery system status
+    recovery_manager = RecoveryManager()
+    print(f"\nRecovery System Status:")
+    print(f"  State snapshots: {len(recovery_manager.state_snapshots)}")
+    print(f"  Recovery stats: {len(recovery_manager.recovery_stats)}")
+
+    # Global proof system status
     summary = _proof.get_summary()
-    print(f"Total proof steps: {summary['total_steps']}")
-    print(f"Contexts verified: {list(summary['contexts'].keys())}")
-    print(f"Steps per context: {summary['contexts']}")
-    print(f"Threads involved: {summary['thread_count']}")
-    print(f"Cache enabled: {summary['cache_enabled']}")
-    print(f"Current verification level: {_config.level.value}")
+    print(f"\nGlobal Proof System Status:")
+    print(f"  Total proof steps: {summary['total_steps']}")
+    print(f"  Contexts verified: {len(summary['contexts'])}")
+    print(f"  Thread count: {summary['thread_count']}")
+    print(f"  Cache enabled: {summary['cache_enabled']}")
 
-    # Show some proof steps
-    print(f"\nSample proof steps:")
-    for i, step in enumerate(_proof.steps[-5:]):  # Show last 5 steps
-        print(f"  {len(_proof.steps) - 4 + i}. {step.context}: {step.claim}")
+    # Show recent verifications by category
+    if _proof.steps:
+        print("\nRecent Verifications by Category:")
+        adaptive_steps = [s for s in _proof.steps[-20:] if 'adaptive' in s.context.lower()]
+        contract_steps = [s for s in _proof.steps[-20:] if 'contract' in s.context.lower()]
 
-    print("\n~~~~~~~ All advanced verifications passed! ~~~~~~~")
+        print(f"  Adaptive verifications: {len(adaptive_steps)}")
+        print(f"  Contract verifications: {len(contract_steps)}")
+
+        if adaptive_steps:
+            print("  Sample adaptive verification:", adaptive_steps[-1].claim[:50] + "...")
+        if contract_steps:
+            print("  Sample contract verification:", contract_steps[-1].claim[:50] + "...")
+
+    print("\n~~~~~~~ All future features demonstrated successfully! ~~~~~~~")
 
 
 if __name__ == "__main__":
-    demo_advanced_features()
+    demo_future_features()

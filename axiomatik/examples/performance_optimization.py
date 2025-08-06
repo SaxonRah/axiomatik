@@ -19,9 +19,9 @@ import threading
 import concurrent.futures
 import statistics
 from typing import List, Dict, Any
-import pyproof.pyproof
-from pyproof.pyproof import require, contract, proof_context, gradually_verify
-from pyproof.pyproof import Config, VerificationLevel, verification_mode
+import axiomatik.axiomatik
+from axiomatik.axiomatik import require, contract, proof_context, gradually_verify
+from axiomatik.axiomatik import Config, VerificationLevel, verification_mode
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -457,8 +457,8 @@ class VerificationBenchmark:
 
         for level in levels:
             # Configure verification level
-            old_level = pyproof.pyproof._config.level
-            pyproof.pyproof._config.level = level
+            old_level = axiomatik.axiomatik._config.level
+            axiomatik.axiomatik._config.level = level
 
             try:
                 # Benchmark simple operations
@@ -485,7 +485,7 @@ class VerificationBenchmark:
 
             finally:
                 # Restore original level
-                pyproof.pyproof._config.level = old_level
+                axiomatik.axiomatik._config.level = old_level
 
         # Calculate overhead compared to OFF mode
         if VerificationLevel.OFF.value in results:
@@ -515,7 +515,7 @@ class VerificationBenchmark:
             result = value * 2 + 1
 
             # Verification that scales with level
-            if pyproof.pyproof._config.level in [VerificationLevel.FULL, VerificationLevel.DEBUG]:
+            if axiomatik.axiomatik._config.level in [VerificationLevel.FULL, VerificationLevel.DEBUG]:
                 require("result is odd", result % 2 == 1)
                 require("result is correct", result == value * 2 + 1)
 
@@ -530,11 +530,11 @@ class VerificationBenchmark:
 
         for cache_size in cache_sizes:
             # Configure cache
-            old_cache_enabled = pyproof.pyproof._config.cache_enabled
-            pyproof.pyproof._config.cache_enabled = cache_size > 0
+            old_cache_enabled = axiomatik.axiomatik._config.cache_enabled
+            axiomatik.axiomatik._config.cache_enabled = cache_size > 0
 
             # Clear existing cache
-            pyproof.pyproof._proof.clear()
+            axiomatik.axiomatik._proof.clear()
 
             try:
                 times = []
@@ -552,7 +552,7 @@ class VerificationBenchmark:
                 mean_time = statistics.mean(times)
 
                 # Get cache statistics
-                proof_summary = pyproof.pyproof._proof.get_summary()
+                proof_summary = axiomatik.axiomatik._proof.get_summary()
 
                 results[f"cache_size_{cache_size}"] = {
                     'mean_time_ms': mean_time * 1000,
@@ -563,7 +563,7 @@ class VerificationBenchmark:
                 }
 
             finally:
-                pyproof.pyproof._config.cache_enabled = old_cache_enabled
+                axiomatik.axiomatik._config.cache_enabled = old_cache_enabled
 
         self.benchmark_results['caching_impact'] = results
         return results
@@ -610,7 +610,7 @@ class VerificationBenchmark:
 
     def generate_performance_report(self) -> str:
         """Generate comprehensive performance report"""
-        report = ["PyProof Performance Benchmark Report", "=" * 50, ""]
+        report = ["Axiomatik Performance Benchmark Report", "=" * 50, ""]
 
         # Verification levels benchmark
         if 'verification_levels' in self.benchmark_results:
@@ -653,30 +653,30 @@ class ProductionDeploymentDemo:
 
         # Production configuration
         if os.getenv('ENVIRONMENT') == 'production':
-            pyproof.pyproof._config.level = VerificationLevel.OFF
-            pyproof.pyproof._config.performance_mode = True
-            pyproof.pyproof._config.cache_enabled = False
+            axiomatik.axiomatik._config.level = VerificationLevel.OFF
+            axiomatik.axiomatik._config.performance_mode = True
+            axiomatik.axiomatik._config.cache_enabled = False
             print("   Configured for PRODUCTION: verification OFF, performance mode ON")
 
         # Staging configuration
         elif os.getenv('ENVIRONMENT') == 'staging':
-            pyproof.pyproof._config.level = VerificationLevel.CONTRACTS
-            pyproof.pyproof._config.performance_mode = True
-            pyproof.pyproof._config.cache_enabled = True
+            axiomatik.axiomatik._config.level = VerificationLevel.CONTRACTS
+            axiomatik.axiomatik._config.performance_mode = True
+            axiomatik.axiomatik._config.cache_enabled = True
             print("   Configured for STAGING: contracts only, caching enabled")
 
         # Development configuration
         elif os.getenv('ENVIRONMENT') == 'development':
-            pyproof.pyproof._config.level = VerificationLevel.FULL
-            pyproof.pyproof._config.performance_mode = False
-            pyproof.pyproof._config.cache_enabled = True
+            axiomatik.axiomatik._config.level = VerificationLevel.FULL
+            axiomatik.axiomatik._config.performance_mode = False
+            axiomatik.axiomatik._config.cache_enabled = True
             print("   Configured for DEVELOPMENT: full verification")
 
         # Testing configuration
         else:
-            pyproof.pyproof._config.level = VerificationLevel.DEBUG
-            pyproof.pyproof._config.performance_mode = False
-            pyproof.pyproof._config.cache_enabled = True
+            axiomatik.axiomatik._config.level = VerificationLevel.DEBUG
+            axiomatik.axiomatik._config.performance_mode = False
+            axiomatik.axiomatik._config.cache_enabled = True
             print("   Configured for TESTING: debug mode with full verification")
 
     @staticmethod
@@ -781,7 +781,7 @@ class ProductionDeploymentDemo:
 
 def demonstrate_performance_optimization():
     """Demonstrate all performance optimization patterns"""
-    print("PyProof Performance Optimization Examples")
+    print("Axiomatik Performance Optimization Examples")
     print("~" * 80)
 
     # 1. Configurable Service
@@ -864,7 +864,7 @@ def demonstrate_performance_optimization():
 
     # 6. Final Performance Summary
     print("\n6. Overall Performance Summary:")
-    final_summary = pyproof.pyproof._proof.get_summary()
+    final_summary = axiomatik.axiomatik._proof.get_summary()
     print(f"   Total proof steps executed: {final_summary['total_steps']}")
     print(f"   Verification contexts used: {len(final_summary['contexts'])}")
     print(f"   Thread safety verified: {final_summary['thread_count']} threads")

@@ -12,9 +12,9 @@ Run with: python data_structures.py
 """
 
 import bisect
-import pyproof.pyproof
-from pyproof.pyproof import require, contract, proof_context, auto_contract
-from pyproof.pyproof import PositiveInt, NonEmptyList
+import axiomatik.axiomatik
+from axiomatik.axiomatik import require, contract, proof_context, auto_contract
+from axiomatik.axiomatik import PositiveInt, NonEmptyList
 from typing import List, Optional, Any, TypeVar
 
 T = TypeVar('T')
@@ -499,7 +499,7 @@ class VerifiedGraph:
 
 def demonstrate_data_structures():
     """Demonstrate all verified data structures and algorithms"""
-    print("PyProof Verified Data Structures and Algorithms")
+    print("Axiomatik Verified Data Structures and Algorithms")
     print("~" * 80)
 
     # 1. Verified Stack
@@ -580,13 +580,13 @@ def demonstrate_data_structures():
 
     # 7. Proof Summary
     print("\n7. Verification Summary:")
-    summary = pyproof.pyproof._proof.get_summary()
+    summary = axiomatik.axiomatik._proof.get_summary()
     print(f"  Total proof steps: {summary['total_steps']}")
     print(f"  Verified contexts: {len(summary['contexts'])}")
 
-    if pyproof.pyproof._proof.steps:
+    if axiomatik.axiomatik._proof.steps:
         print("  Recent verifications:")
-        for step in pyproof.pyproof._proof.steps[-3:]:
+        for step in axiomatik.axiomatik._proof.steps[-3:]:
             context = f" ({step.context})" if step.context else ""
             print(f"    - {step.claim}{context}")
 

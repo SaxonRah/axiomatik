@@ -18,9 +18,9 @@ import secrets
 import time
 import re
 from typing import Dict, List, Any, Optional
-import pyproof.pyproof
-from pyproof.pyproof import require, contract, TaintedValue, SecurityLabel, track_sensitive_data
-from pyproof.pyproof import InformationFlowTracker, _plugin_registry, ProofFailure
+import axiomatik.axiomatik
+from axiomatik.axiomatik import require, contract, TaintedValue, SecurityLabel, track_sensitive_data
+from axiomatik.axiomatik import InformationFlowTracker, _plugin_registry, ProofFailure
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -664,7 +664,7 @@ class SecureDataPipeline:
 
 def demonstrate_security_verification():
     """Demonstrate all security verification features"""
-    print("PyProof Security Verification Examples")
+    print("Axiomatik Security Verification Examples")
     print("~" * 80)
 
     # 1. Information Flow Tracking
@@ -825,11 +825,11 @@ def demonstrate_security_verification():
 
     # 6. Security Verification Summary
     print("\n6. Security Verification Summary:")
-    summary = pyproof._proof.get_summary()
+    summary = axiomatik._proof.get_summary()
     print(f"   Total security verifications: {summary['total_steps']}")
 
     # Count security-related proof steps
-    security_steps = [s for s in pyproof._proof.steps
+    security_steps = [s for s in axiomatik._proof.steps
                       if any(keyword in s.claim.lower() for keyword in
                              ['security', 'encrypt', 'sanitiz', 'privilege', 'flow'])]
     print(f"   Security-specific proofs: {len(security_steps)}")

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-pyproofify.py – generate a PyProof-instrumented copy of a project
+axiomatikify.py – generate a Axiomatik-instrumented copy of a project
 Usage:
-    python pyproofify.py src/ proofed/ --loops --ghost --asserts --temporal --protocols --contracts
+    python axiomatikify.py src/ proofed/ --loops --ghost --asserts --temporal --protocols --contracts
 
 Testing (ran from 'py-proof root folder'):
-    python pyproof/pyproofify.py pyproof/test/  proofed/  --all
+    python axiomatik/axiomatikify.py axiomatik/test/  proofed/  --all
 """
 import shutil, click
 from pathlib import Path
@@ -79,7 +79,7 @@ class ContractInjector(cst.CSTTransformer):
         if self.contracts:
             auto_contract_decorator = cst.Decorator(
                 decorator=cst.Attribute(
-                    value=cst.Name("pyproof"), attr=cst.Name("auto_contract")
+                    value=cst.Name("axiomatik"), attr=cst.Name("auto_contract")
                 )
             )
             new_decorators.append(auto_contract_decorator)
@@ -149,7 +149,7 @@ class ContractInjector(cst.CSTTransformer):
 
         # Build require() call
         require_call = cst.Call(
-            func=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("require")),
+            func=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("require")),
             args=[
                 cst.Arg(value=cst.SimpleString(f'"{escaped_claim}"')),
                 cst.Arg(value=test_expr)
@@ -250,7 +250,7 @@ class ContractInjector(cst.CSTTransformer):
     @staticmethod
     def _wrap_body_in_proof_context(body: cst.BaseSuite, context_name: str) -> cst.BaseSuite:
         """Wrap the body in a proof_context with statement"""
-        invariant_call = cst.parse_expression(f"pyproof.proof_context('{context_name}')")
+        invariant_call = cst.parse_expression(f"axiomatik.proof_context('{context_name}')")
 
         with_stmt = cst.With(
             items=[cst.WithItem(item=invariant_call)],
@@ -327,9 +327,9 @@ class ContractInjector(cst.CSTTransformer):
             target_state = file_method_to_state[method_name]
             return cst.Decorator(
                 decorator=cst.Call(
-                    func=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("protocol_method")),
+                    func=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("protocol_method")),
                     args=[
-                        cst.Arg(value=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("filemanager_protocol"))),
+                        cst.Arg(value=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("filemanager_protocol"))),
                         cst.Arg(value=cst.SimpleString(f'"{target_state}"'))
                     ]
                 )
@@ -338,9 +338,9 @@ class ContractInjector(cst.CSTTransformer):
             target_state = state_method_to_state[method_name]
             return cst.Decorator(
                 decorator=cst.Call(
-                    func=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("protocol_method")),
+                    func=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("protocol_method")),
                     args=[
-                        cst.Arg(value=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("statemachine_protocol"))),
+                        cst.Arg(value=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("statemachine_protocol"))),
                         cst.Arg(value=cst.SimpleString(f'"{target_state}"'))
                     ]
                 )
@@ -365,7 +365,7 @@ class ContractInjector(cst.CSTTransformer):
         """Create temporal event recording statement"""
         return cst.SimpleStatementLine(
             body=[cst.Expr(value=cst.Call(
-                func=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("record_temporal_event")),
+                func=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("record_temporal_event")),
                 args=[cst.Arg(value=cst.SimpleString(f'"{event_name}"'))]
             ))]
         )
@@ -389,7 +389,7 @@ class ContractInjector(cst.CSTTransformer):
             target = assign.targets[0].target
             target_name = self._expr_to_string(target)
             tracking_call = cst.Call(
-                func=cst.Attribute(value=cst.Name("pyproof"), attr=cst.Name("track_sensitive_data")),
+                func=cst.Attribute(value=cst.Name("axiomatik"), attr=cst.Name("track_sensitive_data")),
                 args=[
                     cst.Arg(value=cst.SimpleString(f'"{target_name}"')),
                     cst.Arg(value=target)
@@ -412,7 +412,7 @@ class ContractInjector(cst.CSTTransformer):
 @click.option("--all", "enable_all", is_flag=True, help="Enable all instrumentation features")
 def cli(src, dst, loops, ghost, asserts, temporal, protocols, contracts, enable_all):
     """
-    PyProofify: Automatically instrument Python code with PyProof verification
+    Axiomatikify: Automatically instrument Python code with Axiomatik verification
 
     Features:
     - Loops: Wrap loops in proof contexts for invariant checking
@@ -463,7 +463,7 @@ def cli(src, dst, loops, ghost, asserts, temporal, protocols, contracts, enable_
             new_module = wrapper.visit(injector)
 
             # Prepare header with imports
-            header_parts = ["import pyproof"]
+            header_parts = ["import axiomatik"]
 
             import_parts = ["require"]
             if contracts:
@@ -475,13 +475,13 @@ def cli(src, dst, loops, ghost, asserts, temporal, protocols, contracts, enable_
             if ghost:
                 import_parts.append("track_sensitive_data")
 
-            header_parts.append(f"from pyproof import {', '.join(import_parts)}")
+            header_parts.append(f"from axiomatik import {', '.join(import_parts)}")
 
             # Add refinement types
-            header_parts.append("from pyproof import PositiveInt, NonEmptyList")
+            header_parts.append("from axiomatik import PositiveInt, NonEmptyList")
 
             if ghost:
-                header_parts.append("_ghost = pyproof._ghost")
+                header_parts.append("_ghost = axiomatik._ghost")
 
             header = "\n".join(header_parts) + "\n\n"
             new_source = header + new_module.code

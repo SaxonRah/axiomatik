@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-basic_verification.py - Getting started with PyProof
+basic_verification.py - Getting started with Axiomatik
 
-This example demonstrates the fundamental PyProof concepts:
+This example demonstrates the fundamental Axiomatik concepts:
 - Basic require() statements
 - Function contracts
 - Automatic contract generation
@@ -13,9 +13,9 @@ Run with: python basic_verification.py
 """
 
 import math
-import pyproof.pyproof
-from pyproof.pyproof import require, contract, auto_contract, proof_context
-from pyproof.pyproof import PositiveInt, Percentage, NonEmptyList, RefinementType, ProofFailure
+import axiomatik.axiomatik
+from axiomatik.axiomatik import require, contract, auto_contract, proof_context
+from axiomatik.axiomatik import PositiveInt, Percentage, NonEmptyList, RefinementType, ProofFailure
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -306,8 +306,8 @@ def fibonacci_with_proofs(n: int) -> int:
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def demonstrate_basic_verification():
-    """Demonstrate all basic PyProof features"""
-    print("PyProof Basic Verification Examples")
+    """Demonstrate all basic Axiomatik features"""
+    print("Axiomatik Basic Verification Examples")
     print("~" * 80)
 
     # 1. Basic require() statements
@@ -397,15 +397,15 @@ def demonstrate_basic_verification():
 
     # 6. Show proof summary
     print("\n6. Proof summary:")
-    summary = pyproof.pyproof._proof.get_summary()
+    summary = axiomatik.axiomatik._proof.get_summary()
     print(f"  Total proof steps: {summary['total_steps']}")
     print(f"  Contexts verified: {list(summary['contexts'].keys())}")
     print(f"  Cache enabled: {summary['cache_enabled']}")
 
     # Show recent proof steps
-    if pyproof.pyproof._proof.steps:
+    if axiomatik.axiomatik._proof.steps:
         print("\n  Recent proof steps:")
-        for i, step in enumerate(pyproof.pyproof._proof.steps[-5:]):
+        for i, step in enumerate(axiomatik.axiomatik._proof.steps[-5:]):
             context = f" ({step.context})" if step.context else ""
             print(f"    {i + 1}. {step.claim}{context}")
 
