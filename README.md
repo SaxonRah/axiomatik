@@ -52,6 +52,13 @@ def open_file(self):
 - **Performance mode** for production deployments
 - **Automatic instrumentation** with `axiomatikify` tool
 
+
+## Simple Wrapper
+See `SimpleAxiomatik.md` for a simple wrapper around Axiomatik.
+
+Reduced barrier for entry.
+
+
 ## Future Features
 See `FutureFeatures.md` for Adaptive Monitoring, Performance Introspection, Recovery Framework.
 
