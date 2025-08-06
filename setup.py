@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="axiomatik",
-    version="0.1.3",
+    version="0.2.0",
     author="SaxonRah",
     author_email="paraboliclabs@gmail.com",  # Replace with your email
     description="Axiomatik is a comprehensive runtime verification system that brings formal verification concepts to practical Python programming.",
