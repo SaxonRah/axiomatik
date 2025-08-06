@@ -52,6 +52,12 @@ def open_file(self):
 - **Performance mode** for production deployments
 - **Automatic instrumentation** with `pyproofify` tool
 
+## Future Features
+See `FutureFeatures.md` for Adaptive Monitoring, Performance Introspection, Recovery Framework.
+
+While the demo runs, nothing is assumed to be production ready. Here be dragons. Beware.
+
+
 ## Installation
 
 ```bash
@@ -389,6 +395,7 @@ See the `examples/` directory for complete examples:
 - `protocol_verification.py` - API usage pattern verification
 - `security_verification.py` - Information flow and crypto verification
 - `performance_optimization.py` - Production deployment patterns
+
 
 ## Contributing
 
