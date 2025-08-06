@@ -81,7 +81,7 @@ from .axiomatik import (
 )
 
 # Import from future axiomatik module (advanced features)
-from future.future_axiomatik import (
+from .future_axiomatik import (
     # Adaptive monitoring
     AdaptiveMonitor,
     PropertyManager,
@@ -109,7 +109,7 @@ from future.future_axiomatik import (
 )
 
 # Import from simple axiomatik module (user-friendly interface)
-from simple.simple_axiomatik import (
+from .simple_axiomatik import (
     # User-friendly errors
     VerificationError,
 
@@ -164,7 +164,7 @@ except ImportError:
     axiomatikify = None
 
 # Package metadata
-__version__ = "0.2.0"
+__version__ = "0.2.2"
 __author__ = "Robert Valentine"
 __email__ = "paraboliclabs@gmail.com"
 __url__ = "https://github.com/SaxonRah/axiomatik"
@@ -178,9 +178,9 @@ def axiomatikify_cli():
 
 # Demo functions from each module
 from .axiomatik import demo_advanced_features
-from simple.simple_axiomatik import demo as demo_simple_features
+from axiomatik.simple_axiomatik import demo as demo_simple_features
 try:
-    from future.future_axiomatik import demo_future_features
+    from axiomatik.future_axiomatik import demo_future_features
 except ImportError:
     demo_future_features = None
 
