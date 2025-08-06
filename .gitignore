@@ -1,2 +1,5 @@
 /.idea
 /axiomatik/__pycache__
+/axiomatik.egg-info
+/dist
+/axiomatik/future/__pycache__
