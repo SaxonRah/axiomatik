@@ -64,6 +64,7 @@ While the demo runs, nothing is assumed to be production ready. Here be dragons.
 pip install pyproof
 ```
 ### NOTE: pyproof is not on pip yet. Clone repo for now.
+#### Looking for a new name as pyproof is taken and was an internal tool name.
 
 Or for development:
 ```bash
