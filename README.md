@@ -63,7 +63,9 @@ While the demo runs, nothing is assumed to be production ready. Here be dragons.
 ```bash
 pip install axiomatik
 ```
-### NOTE: axiomatik is now on pip! **MIGHT BE BROKEN - USE REPO FOR NOW. OR TRY IT OUT!**
+### NOTE: axiomatik is now on pip! **MIGHT BE BROKEN - USE REPO FOR NOW.**
+**Maybe you'd like to try the pypi release and show issues.**
+This is my first pypi project, I'm used to closed source managment. There will be teething issues while I figure pypi out.
 
 Or for development:
 ```bash
