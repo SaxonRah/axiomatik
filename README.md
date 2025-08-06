@@ -48,7 +48,65 @@ class File:
     def close(self): pass
 ```
 
-### Simple Axiomatik Rich Type System
+## Core Features
+
+### Runtime Verification
+- **Proof-based assertions** with `require()` instead of `assert`
+- **Function contracts** with preconditions and postconditions
+- **Loop invariants** and termination proofs
+- **Protocol verification** for API usage patterns
+- **Data structure invariants** for custom classes
+
+### Advanced Verification
+- **Refinement types** for precise constraints (`PositiveInt`, `NonEmptyList`, etc.)
+- **Information flow tracking** for security-sensitive data
+- **Temporal properties** for event sequences and timing
+- **Ghost state** for proof-only auxiliary data
+- **Plugin system** for domain-specific verification
+
+### Performance & Production
+- **Configurable verification levels** (off/contracts/invariants/full/debug)
+- **Proof caching** for expensive computations
+- **Thread-safe** operation with concurrent proof traces
+- **Performance mode** for production deployments
+- **Automatic instrumentation** with `axiomatikify` tool
+
+
+## Simple Wrapper
+See `SimpleAxiomatik.md` for a simple wrapper around Axiomatik.
+
+Reduced barrier for entry.
+
+
+## Future Features
+See `FutureFeatures.md` for Adaptive Monitoring, Performance Introspection, Recovery Framework.
+
+While the demo runs, nothing is assumed to be production ready. Here be dragons. Beware.
+
+
+## Installation
+
+```bash
+pip install axiomatik
+```
+### NOTE: axiomatik is now on pip! **MIGHT BE BROKEN - USE REPO FOR NOW.**
+**Maybe you'd like to try the pypi release and show issues.**
+This is my first pypi project, I'm used to closed source managment. There will be teething issues while I figure pypi out.
+
+Or for development:
+```bash
+git clone https://github.com/your-org/axiomatik
+cd axiomatik
+pip install -e .
+```
+
+## Documentation
+
+### Basic Usage
+
+#### 1. Proof-Based Assertions
+
+Replace `assert` with `require()` for better error messages and proof traces:
 
 ```python
 # Built-in type aliases from simple_axiomatik.py
