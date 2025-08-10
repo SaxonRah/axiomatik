@@ -1,4 +1,5 @@
-# Axiomatik: Performant Runtime Verification for Python
+# Axiomatik: Performant Runtime Verification for Python and C++17
+> NOTE: C++17 version included for shits and giggles. Full axiomatik core is implmented, while simple and future features will be done at a later date.
 
 **Axiomatik is a comprehensive runtime verification system that brings formal verification concepts to practical Python programming. It provides proof-based assertions, contracts, invariants, and advanced verification features with performance optimizations for production use.**
 
