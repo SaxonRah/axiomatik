@@ -913,6 +913,8 @@ The repository includes comprehensive demonstration files:
 - **`test.py`** - Comprehensive test scenarios showing automatic instrumentation capabilities
 - **`axiomatik.py`** - Full demonstration of core verification features including protocols, information flow, and temporal properties
 - **`future_axiomatik.py`** - Advanced enterprise features demo with adaptive monitoring, performance analysis, and recovery
+- **`verification_space_shooter.py`** - Simple "Space Shooter" game showing simple axiomatik runtime verification is performant enough for games.
+- **`advanced_verification_space_shooter.py`** - Advanced "Space Shooter" game showing complete axiomatik runtime verification is performant enough for games.
 
 ## Installation
 
