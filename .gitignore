@@ -3,3 +3,6 @@
 /axiomatik.egg-info
 /dist
 /axiomatik/future/__pycache__
+/cpp/axiomatik/.vs
+/cpp/axiomatik/axiomatik/x64
+/cpp/axiomatik/x64
