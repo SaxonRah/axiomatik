@@ -332,7 +332,7 @@ void file_close(FileHandle& file) {
 // MAIN DEMONSTRATION
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-int main() {
+int temp_main() {
     std::cout << "Axiomatik C++ Transparent Code Demonstration\n";
     std::cout << "============================================\n\n";
 

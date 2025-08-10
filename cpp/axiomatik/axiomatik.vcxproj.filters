@@ -26,5 +26,8 @@
     <ClCompile Include="axiomatik.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="heavy_demo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

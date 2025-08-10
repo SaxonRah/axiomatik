@@ -1,0 +1,154 @@
+Axiomatik C++ Performance Benchmark
+===================================
+
+Running VERIFIED benchmark...
+================================
+Phase 1: Monte Carlo simulation with 500000 samples...
+Phase 2: Matrix computations (50x50, 8 operations)...
+  Matrix operations progress: [1: norm=1.18e+00, max=1.07e-01] [2: norm=4.83e-01, max=3.54e-02] [3: norm=1.99e-01, max=1.57e-02] [4: norm=7.94e-02, max=6.43e-03] [5: norm=3.14e-02, max=2.70e-03] [6: norm=1.21e-02, max=8.63e-04] [7: norm=4.76e-03, max=4.20e-04] [8: norm=1.95e-03, max=1.90e-04]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.139288 (error: 0.002305)
+Matrix result norm: 1.951372e-03
+Monte Carlo time: 34548ms
+Matrix computation time: 39673ms
+Total computation time: 74222ms
+
+=== VERIFICATION OVERHEAD ANALYSIS ===
+Total verifications performed: 12725167
+Total verification time: 36163 microseconds
+Average verification time: 0 microseconds
+Cache hit rate: 0.0%
+Total benchmark time: 74229ms
+Verification overhead: 36.16ms (0.05%)
+
+
+Running UNVERIFIED benchmark...
+================================
+Phase 1: Monte Carlo simulation with 500000 samples...
+Phase 2: Matrix computations (50x50, 8 operations)...
+  Matrix operations progress: [1: norm=1.15e+00, max=7.49e-02] [2: norm=4.46e-01, max=2.98e-02] [3: norm=1.76e-01, max=1.31e-02] [4: norm=7.00e-02, max=5.08e-03] [5: norm=2.82e-02, max=2.38e-03] [6: norm=1.14e-02, max=9.34e-04] [7: norm=4.58e-03, max=4.56e-04] [8: norm=1.79e-03, max=1.37e-04]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.142696 (error: 0.001103)
+Matrix result norm: 1.789830e-03
+Monte Carlo time: 19209ms
+Matrix computation time: 17508ms
+Total computation time: 36718ms
+Unverified benchmark time: 36720ms
+
+
+SCALABILITY ANALYSIS:
+====================
+
+Testing Light workload...
+Phase 1: Monte Carlo simulation with 100000 samples...
+Phase 2: Matrix computations (50x50, 5 operations)...
+  Matrix operations progress: [1: norm=1.20e+00, max=8.00e-02] [2: norm=5.03e-01, max=4.01e-02] [3: norm=2.10e-01, max=1.50e-02] [4: norm=8.87e-02, max=7.47e-03] [5: norm=3.89e-02, max=2.94e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.126040 (error: 0.015553)
+Matrix result norm: 3.885101e-02
+Monte Carlo time: 6798ms
+Matrix computation time: 24700ms
+Total computation time: 31498ms
+Phase 1: Monte Carlo simulation with 100000 samples...
+Phase 2: Matrix computations (50x50, 5 operations)...
+  Matrix operations progress: [1: norm=1.19e+00, max=1.01e-01] [2: norm=5.08e-01, max=4.33e-02] [3: norm=2.19e-01, max=1.61e-02] [4: norm=9.96e-02, max=8.02e-03] [5: norm=4.42e-02, max=3.21e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.137200 (error: 0.004393)
+Matrix result norm: 4.415720e-02
+Monte Carlo time: 3763ms
+Matrix computation time: 10735ms
+Total computation time: 14498ms
+  Verified time: 31502ms
+  Unverified time: 14501ms
+  Overhead: 17001.00ms (117.24%)
+  Verifications performed: 6050104
+
+Testing Medium workload...
+Phase 1: Monte Carlo simulation with 500000 samples...
+Phase 2: Matrix computations (75x75, 7 operations)...
+  Matrix operations progress: [1: norm=2.15e+00, max=1.12e-01] [2: norm=1.05e+00, max=5.18e-02] [3: norm=5.44e-01, max=2.98e-02] [4: norm=2.81e-01, max=1.67e-02] [5: norm=1.44e-01, max=7.89e-03] [6: norm=7.68e-02, max=4.77e-03] [7: norm=4.18e-02, max=2.88e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.141480 (error: 0.000113)
+Matrix result norm: 4.177801e-02
+Monte Carlo time: 34064ms
+Matrix computation time: 115671ms
+Total computation time: 149735ms
+Phase 1: Monte Carlo simulation with 500000 samples...
+Phase 2: Matrix computations (75x75, 7 operations)...
+  Matrix operations progress: [1: norm=2.17e+00, max=1.18e-01] [2: norm=1.05e+00, max=5.39e-02] [3: norm=5.29e-01, max=2.73e-02] [4: norm=2.62e-01, max=1.33e-02] [5: norm=1.30e-01, max=7.02e-03] [6: norm=6.52e-02, max=3.10e-03] [7: norm=3.31e-02, max=1.79e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.139744 (error: 0.001849)
+Matrix result norm: 3.306548e-02
+Monte Carlo time: 18475ms
+Matrix computation time: 49413ms
+Total computation time: 67888ms
+  Verified time: 149737ms
+  Unverified time: 67891ms
+  Overhead: 81846.00ms (120.56%)
+  Verifications performed: 28575153
+
+Testing Heavy workload...
+Phase 1: Monte Carlo simulation with 1000000 samples...
+Phase 2: Matrix computations (100x100, 10 operations)...
+  Matrix operations progress: [1: norm=3.35e+00, max=1.30e-01] [2: norm=1.92e+00, max=6.89e-02] [3: norm=1.11e+00, max=4.21e-02] [4: norm=6.53e-01, max=2.71e-02] [5: norm=3.72e-01, max=1.71e-02] [6: norm=2.18e-01, max=9.68e-03] [7: norm=1.28e-01, max=5.30e-03] [8: norm=7.60e-02, max=3.45e-03] [9: norm=4.52e-02, max=2.15e-03] [10: norm=2.69e-02, max=1.32e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.139912 (error: 0.001681)
+Matrix result norm: 2.691370e-02
+Monte Carlo time: 67674ms
+Matrix computation time: 387310ms
+Total computation time: 454984ms
+Phase 1: Monte Carlo simulation with 1000000 samples...
+Phase 2: Matrix computations (100x100, 10 operations)...
+  Matrix operations progress: [1: norm=3.27e+00, max=1.46e-01] [2: norm=1.87e+00, max=7.88e-02] [3: norm=1.08e+00, max=4.28e-02] [4: norm=6.19e-01, max=2.45e-02] [5: norm=3.62e-01, max=1.57e-02] [6: norm=2.07e-01, max=9.43e-03] [7: norm=1.19e-01, max=5.24e-03] [8: norm=6.83e-02, max=3.19e-03] [9: norm=3.96e-02, max=2.41e-03] [10: norm=2.30e-02, max=1.03e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.142460 (error: 0.000867)
+Matrix result norm: 2.302234e-02
+Monte Carlo time: 37002ms
+Matrix computation time: 167070ms
+Total computation time: 204073ms
+  Verified time: 454987ms
+  Unverified time: 204075ms
+  Overhead: 250912.00ms (122.95%)
+  Verifications performed: 90100221
+
+Testing Very heavy workload...
+Phase 1: Monte Carlo simulation with 2000000 samples...
+Phase 2: Matrix computations (125x125, 12 operations)...
+  Matrix operations progress: [1: norm=4.61e+00, max=1.57e-01] [2: norm=2.95e+00, max=8.85e-02] [3: norm=1.91e+00, max=6.42e-02] [4: norm=1.24e+00, max=4.65e-02] [5: norm=7.99e-01, max=2.77e-02] [6: norm=5.24e-01, max=1.86e-02] [7: norm=3.44e-01, max=1.18e-02] [8: norm=2.27e-01, max=8.79e-03] [9: norm=1.51e-01, max=5.49e-03] [10: norm=1.01e-01, max=3.86e-03] [11: norm=6.72e-02, max=2.56e-03] [12: norm=4.47e-02, max=1.80e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.142482 (error: 0.000889)
+Matrix result norm: 4.469057e-02
+Monte Carlo time: 134703ms
+Matrix computation time: 912657ms
+Total computation time: 1047360ms
+Phase 1: Monte Carlo simulation with 2000000 samples...
+Phase 2: Matrix computations (125x125, 12 operations)...
+  Matrix operations progress: [1: norm=4.61e+00, max=1.71e-01] [2: norm=2.95e+00, max=1.07e-01] [3: norm=1.88e+00, max=6.09e-02] [4: norm=1.20e+00, max=3.89e-02] [5: norm=7.70e-01, max=2.78e-02] [6: norm=4.86e-01, max=1.69e-02] [7: norm=3.13e-01, max=1.21e-02] [8: norm=1.97e-01, max=8.26e-03] [9: norm=1.26e-01, max=4.81e-03] [10: norm=8.08e-02, max=3.01e-03] [11: norm=5.21e-02, max=1.86e-03] [12: norm=3.38e-02, max=1.29e-03]
+
+=== COMPUTATIONAL RESULTS ===
+pi estimate: 3.140048 (error: 0.001545)
+Matrix result norm: 3.380403e-02
+Monte Carlo time: 75037ms
+Matrix computation time: 387064ms
+Total computation time: 462101ms
+  Verified time: 1047362ms
+  Unverified time: 462108ms
+  Overhead: 585254.00ms (126.65%)
+  Verifications performed: 207531549
+
+=== BENCHMARK COMPLETE ===
+This benchmark demonstrates Axiomatik's runtime verification
+overhead during computationally intensive tasks including:
+- Monte Carlo simulation with statistical verification
+- Matrix operations with mathematical invariants
+- Contract verification and temporal properties
+- Performance monitoring and cache optimization
