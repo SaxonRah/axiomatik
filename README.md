@@ -1,5 +1,11 @@
-# Axiomatik: Performant Runtime Verification for Python and C++17
+# Axiomatik: Performant Runtime Verification for Python and C++17/C17
 > NOTE: C++17 version included for shits and giggles. Full axiomatik core is implmented, while simple and future features will be done at a later date.
+>
+> Looking for public code to test on. you can find this code in `cpp/axiomatik`
+
+> NOTE: C17 version included for shits and giggles. I was just messing around with the idea while I was looking for C++17 code bases to test on.
+>
+> Using Box2D 3.1.1 to verify completely Box2D's b2World_Step and b2ShapeDistance functions, which make the overhead very apparent in the Box2D sensors demo, but largely, the overhead is negligible in all other demos, though some demos you can notice it more than others. You can find the code in `cpp/axiomatik_c`. Both functions are completely verified at runtime, and while overkill it does a good job at showing the C17 version's overhead.
 
 **Axiomatik is a comprehensive runtime verification system that brings formal verification concepts to practical Python programming. It provides proof-based assertions, contracts, invariants, and advanced verification features with performance optimizations for production use.**
 
