@@ -443,6 +443,15 @@ public:
 // BENCHMARK HARNESS WITH VERIFICATION OVERHEAD MEASUREMENT
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+void report_metrics(const axiomatik::PerformanceMetrics& metrics) {
+    std::cout << "Total verifications: " << metrics.total_verifications << "\n";
+    std::cout << "Total time: " << (metrics.total_time_ns / 1000.0) << " microseconds\n";
+    std::cout << "Average time: " << metrics.average_time_us << " microseconds\n";
+    std::cout << "Min time: " << (metrics.min_time_ns / 1000.0) << " microseconds\n";
+    std::cout << "Max time: " << (metrics.max_time_ns / 1000.0) << " microseconds\n";
+    std::cout << "Cache hit rate: " << metrics.cache_hit_rate << "%\n";
+}
+
 void run_benchmark_with_verification() {
     std::cout << "Running VERIFIED benchmark...\n";
     std::cout << "================================\n";
@@ -466,14 +475,10 @@ void run_benchmark_with_verification() {
         std::cout << "\n=== VERIFICATION OVERHEAD ANALYSIS ===\n";
 
         auto metrics = get_performance_metrics();
-        std::cout << "Total verifications performed: " << metrics.total_verifications << "\n";
-        std::cout << "Total verification time: " << metrics.total_time.count() << " microseconds\n";
-        std::cout << "Average verification time: " << metrics.average_time.count() << " microseconds\n";
-        std::cout << "Cache hit rate: " << std::fixed << std::setprecision(1)
-            << (metrics.cache_hit_rate * 100) << "%\n";
+        report_metrics(metrics);
         std::cout << "Total benchmark time: " << total_time.count() << "ms\n";
 
-        double verification_overhead_ms = metrics.total_time.count() / 1000.0;
+        double verification_overhead_ms = metrics.total_time_ns / 1000.0;
         double overhead_percentage = (verification_overhead_ms / total_time.count()) * 100.0;
 
         std::cout << "Verification overhead: " << std::fixed << std::setprecision(2)
